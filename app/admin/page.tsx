@@ -3,17 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-type Message = {
+// Define a proper type for the messages
+interface Message {
   id: string;
   chat_id: string;
   user_id: string;
   content: string;
   role: string;
   timestamp: string;
-};
+}
 
 export default function AdminPage() {
-  // Fix the TypeScript error by defining the proper type
+  // Initialize with the correct type
   const [messages, setMessages] = useState<Message[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -26,7 +27,7 @@ export default function AdminPage() {
 
     const load = async () => {
       const { data, error } = await supabase.from('messages').select('*').order('timestamp');
-      if (data) setMessages(data);
+      if (data) setMessages(data as Message[]); // Type cast here for safety
       if (error) console.error(error);
     };
     load();
