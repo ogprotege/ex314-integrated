@@ -1,71 +1,64 @@
-export type ChatServiceConfig = {
-  apiUrl: string;
-  apiKey?: string;
-  // Add any other configuration options your LLM needs
-};
 export class ChatService {
-  private config: ChatServiceConfig;
-  constructor(config: ChatServiceConfig) {
-    this.config = config;
-  }
+  /**
+   * Send a chat message to the LLM endpoint and return the response
+   */
   async sendMessage(message: string): Promise<string> {
     try {
-      const response = await fetch(this.config.apiUrl, {
-        method: "POST",
+      const response = await fetch(process.env.NEXT_PUBLIC_LLM_API_URL!, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`
+          'Content-Type': 'application/json',
+          ...(process.env.NEXT_PUBLIC_LLM_API_KEY && {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`
           })
         },
-        body: JSON.stringify({
-          message
-          // Add any other parameters your LLM API needs
-        })
+        body: JSON.stringify({ message })
       });
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`LLM API error: ${response.status}`);
       }
+
       const data = await response.json();
-      return data.response; // Adjust this based on your API response structure
+      return data.response; // Adjust if your API returns differently
     } catch (error) {
-      console.error("Chat service error:", error);
+      console.error('ChatService.sendMessage error:', error);
       throw error;
     }
   }
-  // Add method for streaming responses if your LLM supports it
+
+  /**
+   * Send a streaming request to the LLM endpoint and process response chunks
+   */
   async streamMessage(message: string, onChunk: (chunk: string) => void): Promise<void> {
     try {
-      const response = await fetch(`${this.config.apiUrl}/stream`, {
-        method: "POST",
+      const response = await fetch(`${process.env.NEXT_PUBLIC_LLM_API_URL!}/stream`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`
+          'Content-Type': 'application/json',
+          ...(process.env.NEXT_PUBLIC_LLM_API_KEY && {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`
           })
         },
-        body: JSON.stringify({
-          message
-          // Add any other parameters your LLM API needs
-        })
+        body: JSON.stringify({ message })
       });
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`LLM streaming error: ${response.status}`);
       }
+
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
+      if (!reader) throw new Error('No readable stream in response');
+
+      const decoder = new TextDecoder();
       while (true) {
-        const {
-          done,
-          value
-        } = await reader.read();
+        const { done, value } = await reader.read();
         if (done) break;
-        // Assuming the stream is text. Adjust parsing based on your API
-        const chunk = new TextDecoder().decode(value);
+        const chunk = decoder.decode(value, { stream: true });
         onChunk(chunk);
       }
     } catch (error) {
-      console.error("Stream error:", error);
+      console.error('ChatService.streamMessage error:', error);
       throw error;
     }
   }
