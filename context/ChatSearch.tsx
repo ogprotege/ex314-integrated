@@ -12,7 +12,7 @@ export const ChatSearch = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value
     setQuery(q)
-    searchMessages(q)
+    searchMessages?.(q)
   }
 
   return (
