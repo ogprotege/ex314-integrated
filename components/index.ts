@@ -1,7 +1,6 @@
 // components/index.ts
 // This file exports all components to make imports cleaner
 
-export { ChatSearch } from './ChatSearch';
 export { SidebarSection } from './SidebarSection';
 export { Sidebar } from './Sidebar';
 export { ChatInput } from './ChatInput';
