@@ -1,25 +1,47 @@
-// app/api/langchain/route.ts
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const { message } = await req.json()
+  try {
+    const { message } = await req.json()
 
-  const response = await fetch(process.env.NEXT_PUBLIC_LLM_API_URL!, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`,
-    },
-    body: JSON.stringify({ message }),
-  })
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json(
+        { error: 'Invalid request: "message" is required' },
+        { status: 400 }
+      )
+    }
 
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: `LLM API failed: ${response.status}` },
-      { status: 500 }
-    )
+    const apiUrl = process.env.NEXT_PUBLIC_LLM_API_URL
+    const apiKey = process.env.NEXT_PUBLIC_LLM_API_KEY
+
+    if (!apiUrl) {
+      return NextResponse.json(
+        { error: 'Missing LLM API URL in environment' },
+        { status: 500 }
+      )
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey && { Authorization: `Bearer ${apiKey}` })
+      },
+      body: JSON.stringify({ message })
+    })
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: `LLM API error: ${response.status}` },
+        { status: 502 }
+      )
+    }
+
+    const data = await response.json()
+
+    return NextResponse.json({ response: data.response })
+  } catch (error) {
+    console.error('LangChain API error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  const data = await response.json()
-  return NextResponse.json({ response: data.response })
 }
