@@ -1,148 +1,119 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Sidebar } from '@/components/Sidebar';
-import { ChatInput } from '@/components/ChatInput';
+import React, { useEffect, useState } from 'react';
+import { Sidebar } from '../components/Sidebar';
+import { InitialView } from '../components/InitialView';
+import { ChatView } from '../components/ChatView';
+import { Header } from '../components/Header';
 import { useRouter } from 'next/navigation';
-import { useChat } from '@/context/ChatContext';
+import type { Message } from '../lib/types';
 
-export default function HomePage() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+export default function Home() {
+  // Authentication state (in a real app, use a more robust auth solution)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   
   const router = useRouter();
   
-  const { 
-    messages, 
-    activeChatId, 
-    isLoading, 
-    sendMessage, 
-    newChat
-  } = useChat();
-
+  // Set isClient to true once component is mounted
   useEffect(() => {
-    // Check login status on client side only
-    if (typeof window !== 'undefined') {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      setIsLoggedIn(isAuthenticated);
-      setIsLoaded(true);
-      
-      // Redirect if not logged in
-      if (!isAuthenticated) {
-        router.push('/login');
-      }
-    }
-  }, [router]);
+    setIsClient(true);
+  }, []);
 
-  // Handle sidebar toggle
-  const handleToggle = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-  
-  // Handle logout
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      // Keep the user_id but remove authentication flag
-      localStorage.removeItem('isAuthenticated');
-      setIsLoggedIn(false);
+  // Check authentication on mount
+  useEffect(() => {
+    if (!isClient) return;
+    
+    // For demo purposes - in a real app, verify auth status from cookies/localStorage
+    const isLoggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
+    if (!isLoggedIn) {
       router.push('/login');
+    } else {
+      setIsAuthenticated(true);
     }
+  }, [router, isClient]);
+
+  const handleLogout = () => {
+    if (!isClient) return;
+    
+    sessionStorage.removeItem('isAuthenticated');
+    router.push('/login');
   };
-  
-  // Handle new chat creation
-  const handleNewChat = () => {
-    newChat();
+
+  const handleSendMessage = async (content: string) => {
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content,
+      role: 'user',
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    
+    let aiResponse = "I understand you're asking about that. Let me help you with this.";
+    
+    if (content.toLowerCase().includes('hello') || content.toLowerCase().includes('hi')) {
+      aiResponse = 'Hello! How can I assist you today?';
+    } else if (content.toLowerCase().includes('help')) {
+      aiResponse = "I'm here to help! What specific assistance do you need?";
+    } else if (content.toLowerCase().includes('thank')) {
+      aiResponse = "You're welcome! Is there anything else you'd like to know?";
+    } else if (content.length < 10) {
+      aiResponse = "Could you please provide more details about what you'd like to know?";
+    } else {
+      aiResponse = `Thank you for your detailed query. Let me break this down:
+1. First, let's consider the main points you've raised.
+2. Based on my analysis, I can help you with this specific situation.
+3. Would you like me to provide more detailed information about any particular aspect?`;
+    }
+    
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: aiResponse,
+      role: 'assistant',
+      timestamp: new Date()
+    };
+    
+    setIsLoading(false);
+    setMessages(prev => [...prev, assistantMessage]);
   };
-  
-  // If still checking login status or not logged in, show loading indicator
-  if (!isLoaded) {
+
+  // Show loading during client-side rendering or authentication check
+  if (!isClient || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="animate-pulse flex gap-2">
-          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
-          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
-          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
-        </div>
+      <div className="flex items-center justify-center h-screen bg-dark-bg">
+        Loading...
       </div>
     );
   }
-  
-  // If not logged in, don't show content
-  if (!isLoggedIn) {
-    return null;
-  }
 
   return (
-    <div className="flex h-screen bg-dark-bg text-white">
-      {/* Sidebar */}
-      <Sidebar
-        isCollapsed={isCollapsed}
-        onToggle={handleToggle}
-        onLogout={handleLogout}
-      />
-      
-      {/* Main Chat Area */}
-      <main className="flex-grow h-full flex flex-col">
-        {/* Chat Messages */}
-        <div className="flex-grow overflow-y-auto p-6">
-          {!activeChatId ? (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto text-gray-400">
-              <h2 className="text-xl font-bold mb-2">Welcome to EX314</h2>
-              <p className="mb-6">Start a new chat or select an existing conversation to begin.</p>
-              <button 
-                onClick={handleNewChat}
-                className="bg-accent-purple hover:bg-purple-hover text-white px-4 py-2 rounded-md transition-colors"
-              >
-                New Chat
-              </button>
-            </div>
+    <div className="flex flex-col w-full h-screen bg-dark-bg text-white font-segoe">
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar 
+          isCollapsed={isSidebarCollapsed} 
+          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+          onLogout={handleLogout} 
+        />
+        <main className="flex-grow flex flex-col h-full overflow-hidden">
+          <Header />
+          {messages.length === 0 ? (
+            <InitialView onSendMessage={handleSendMessage} />
           ) : (
-            <div className="max-w-4xl mx-auto w-full">
-              {messages.map((message) => (
-                <div 
-                  key={message.id} 
-                  className={`mb-6 ${message.role === 'assistant' ? 'text-white' : 'text-gray-300'}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      message.role === 'assistant' ? 'bg-accent-purple' : 'bg-gray-700'
-                    }`}>
-                      {message.role === 'assistant' ? '✝' : 'Y'}
-                    </div>
-                    <div className="flex-grow">
-                      <div className="text-sm text-gray-500 mb-1 flex justify-between">
-                        <span>{message.role === 'assistant' ? 'EX314' : 'You'}</span>
-                        <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
-                      </div>
-                      <div className="prose prose-invert max-w-none">
-                        {message.content}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {isLoading && (
-                <div className="flex items-center justify-center py-10">
-                  <div className="animate-pulse flex gap-2">
-                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
-                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
-                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ChatView 
+              messages={messages} 
+              isLoading={isLoading} 
+              onSendMessage={handleSendMessage} 
+            />
           )}
-        </div>
-        
-        {/* Chat Input */}
-        {activeChatId && (
-          <div className="border-t border-[#222222] p-4">
-            <ChatInput onSendMessage={sendMessage} />
-          </div>
-        )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
