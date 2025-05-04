@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 export type Message = {
   id: string;
@@ -40,33 +41,39 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [userId, setUserId] = useState<string>('');
 
-  const userId = getUserId();
-
-  function getUserId() {
-    let id = localStorage.getItem('user_id');
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem('user_id', id);
-    }
-    return id;
-  }
-
-  function getStorageKey(chatId: string) {
-    return `chat_history_${chatId}_${userId}`;
-  }
-
+  // Set isClient to true once component is mounted
   useEffect(() => {
-    const stored = localStorage.getItem('chat_threads');
-    if (stored) {
-      const parsedChats = JSON.parse(stored);
-      setChats(parsedChats);
-      setVisibleChats(parsedChats);
+    setIsClient(true);
+    
+    // Now it's safe to access localStorage
+    const storedUserId = localStorage.getItem('user_id');
+    if (storedUserId) {
+      setUserId(storedUserId);
+    } else {
+      const newUserId = uuidv4();
+      localStorage.setItem('user_id', newUserId);
+      setUserId(newUserId);
     }
   }, []);
 
+  // Only load chats after component has mounted
   useEffect(() => {
-    if (activeChatId) {
+    if (isClient) {
+      const stored = localStorage.getItem('chat_threads');
+      if (stored) {
+        const parsedChats = JSON.parse(stored);
+        setChats(parsedChats);
+        setVisibleChats(parsedChats);
+      }
+    }
+  }, [isClient]);
+
+  // Load messages when activeChatId changes
+  useEffect(() => {
+    if (isClient && activeChatId) {
       const local = localStorage.getItem(getStorageKey(activeChatId));
       if (local) {
         setMessages(JSON.parse(local));
@@ -81,7 +88,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           });
       }
     }
-  }, [activeChatId]);
+  }, [activeChatId, isClient]);
+
+  function getStorageKey(chatId: string) {
+    return `chat_history_${chatId}_${userId}`;
+  }
 
   const persistChats = (updated: Chat[]) => {
     setChats(updated);
@@ -90,11 +101,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateChat = (id: string, update: Partial<Chat>) => {
+    if (!isClient) return;
     const updated = chats.map((c) => (c.id === id ? { ...c, ...update } : c));
     persistChats(updated);
   };
 
   const deleteChat = (id: string) => {
+    if (!isClient) return;
     const updated = chats.filter((c) => c.id !== id);
     persistChats(updated);
     if (id === activeChatId) {
@@ -106,6 +119,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const newChat = () => {
+    if (!isClient) return;
     const id = Date.now().toString();
     const chat: Chat = {
       id,
@@ -131,6 +145,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const searchMessages = (query: string) => {
+    if (!isClient) return;
     if (!query.trim()) {
       setVisibleChats(chats);
       return;
@@ -153,10 +168,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const sendMessage = async (content: string) => {
-    if (!activeChatId) return;
+    if (!isClient || !activeChatId) return;
 
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       content,
       role: 'user',
       timestamp: new Date()
@@ -186,7 +201,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       const data = await res.json();
 
       const aiMessage: Message = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         content: data.response,
         role: 'assistant',
         timestamp: new Date()
@@ -211,6 +226,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const exportChats = () => {
+    if (!isClient) return;
+    
     if (userId !== 'admin') return alert('Only admin can export');
 
     const exportData: Record<string, Message[]> = {};
