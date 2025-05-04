@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+
 export const Header = () => {
   return <div className="max-w-[800px] mx-auto py-6 px-4">
       <div className="flex flex-col items-center text-center gap-3">
