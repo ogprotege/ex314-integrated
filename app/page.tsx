@@ -42,9 +42,12 @@ export default function HomePage() {
   
   // Handle logout
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    setIsLoggedIn(false);
-    router.push('/login');
+    if (typeof window !== 'undefined') {
+      // Keep the user_id but remove authentication flag
+      localStorage.removeItem('isAuthenticated');
+      setIsLoggedIn(false);
+      router.push('/login');
+    }
   };
   
   // Handle new chat creation
@@ -52,8 +55,21 @@ export default function HomePage() {
     newChat();
   };
   
-  // If still checking login status or not logged in, show nothing
-  if (!isLoaded || !isLoggedIn) {
+  // If still checking login status or not logged in, show loading indicator
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="animate-pulse flex gap-2">
+          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
+          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
+          <div className="w-3 h-3 bg-accent-purple rounded-full"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  // If not logged in, don't show content
+  if (!isLoggedIn) {
     return null;
   }
 
