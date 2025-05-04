@@ -2,115 +2,45 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { LoginPage as LoginComponent } from '../../components/LoginPage';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const [loginError, setLoginError] = useState<string | undefined>();
   const [isClient, setIsClient] = useState(false);
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
+  const router = useRouter();
+  
   // Set isClient to true once component is mounted
   useEffect(() => {
     setIsClient(true);
-    
-    // Check if already logged in
-    if (typeof window !== 'undefined') {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      if (isAuthenticated) {
-        router.push('/');
-      }
-    }
-  }, [router]);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  }, []);
+  
+  // Check if already logged in
+  useEffect(() => {
     if (!isClient) return;
     
-    setIsLoading(true);
-    setError('');
-    
-    // Simple authentication for demo
-    setTimeout(() => {
-      if (password === 'jesus' || password === 'admin') {
-        // Set user_id before authentication flag
-        if (password === 'admin') {
-          localStorage.setItem('user_id', 'admin');
-        } else {
-          // For non-admin users, generate random ID if they don't have one
-          if (!localStorage.getItem('user_id')) {
-            // Use a simple random ID for user
-            const randomId = 'user_' + Math.random().toString(36).substring(2, 9);
-            localStorage.setItem('user_id', randomId);
-          }
-        }
-        
-        // Set authentication flag last
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        // Delay the redirect slightly to ensure localStorage is set
-        setTimeout(() => {
-          router.push('/');
-        }, 100);
-      } else {
-        setError('Invalid password.');
-        setIsLoading(false);
-      }
-    }, 1000);
-  };
+    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+    if (isAuthenticated) {
+      router.push('/');
+    }
+  }, [router, isClient]);
 
+  const handleLogin = (username: string, password: string) => {
+    if (!isClient) return;
+    
+    // Simple mock authentication for preview purposes
+    if (username === 'demo' && password === 'password') {
+      // Store auth state in sessionStorage (use a more robust solution in production)
+      sessionStorage.setItem('isAuthenticated', 'true');
+      router.push('/');
+    } else {
+      setLoginError('Invalid username or password. Try demo/password');
+    }
+  };
+  
   // Don't render during server-side rendering
   if (!isClient) {
     return null;
   }
 
-  return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
-      <div className="bg-card-bg rounded-lg p-8 w-full max-w-md shadow-lg border border-border-color">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-accent-purple rounded-full flex items-center justify-center mx-auto mb-4">
-            <img src="/jerusalem-cross.png" alt="Jerusalem Cross" className="w-10 h-10" />
-          </div>
-          <h1 className="text-xl font-bold">EX314</h1>
-          <p className="text-gray-custom mt-1">Biblical AI Assistant</p>
-        </div>
-        
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 bg-input-bg border border-border-color rounded focus:outline-none focus:border-accent-purple"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-          
-          {error && (
-            <div className="mb-4 p-2 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-sm">
-              {error}
-            </div>
-          )}
-          
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-2 px-4 rounded bg-accent-purple hover:bg-purple-hover text-white transition-colors ${
-              isLoading ? 'opacity-70 cursor-not-allowed' : ''
-            }`}
-          >
-            {isLoading ? 'Authenticating...' : 'Login'}
-          </button>
-        </form>
-        
-        <div className="mt-6 text-center text-sm text-gray-custom">
-          <p>Hint: Password is "jesus"</p>
-          <p className="text-xs mt-1">Admin access: "admin"</p>
-        </div>
-      </div>
-    </div>
-  );
+  return <LoginComponent onLogin={handleLogin} error={loginError} />;
 }
