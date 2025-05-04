@@ -14,27 +14,24 @@ export default function HomePage() {
   const router = useRouter();
   
   const { 
-    chats, 
-    visibleChats,
     messages, 
     activeChatId, 
     isLoading, 
     sendMessage, 
-    newChat, 
-    selectChat, 
-    updateChat, 
-    deleteChat 
+    newChat
   } = useChat();
 
   useEffect(() => {
-    // Check login status
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    setIsLoggedIn(isAuthenticated);
-    setIsLoaded(true);
-    
-    // Redirect if not logged in
-    if (!isAuthenticated) {
-      router.push('/login');
+    // Check login status on client side only
+    if (typeof window !== 'undefined') {
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      setIsLoggedIn(isAuthenticated);
+      setIsLoaded(true);
+      
+      // Redirect if not logged in
+      if (!isAuthenticated) {
+        router.push('/login');
+      }
     }
   }, [router]);
 
@@ -55,22 +52,7 @@ export default function HomePage() {
     newChat();
   };
   
-  // Handle deleting a chat
-  const onDeleteChat = (id: string) => {
-    deleteChat(id);
-  };
-  
-  // Handle selecting a chat
-  const onSelectChat = (id: string) => {
-    selectChat(id);
-  };
-  
-  // Handle updating a chat
-  const onUpdateChat = (id: string, update: any) => {
-    updateChat(id, update);
-  };
-  
-  // If still checking login status or not logged in, show loading
+  // If still checking login status or not logged in, show nothing
   if (!isLoaded || !isLoggedIn) {
     return null;
   }
@@ -101,7 +83,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="max-w-4xl mx-auto w-full">
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <div 
                   key={message.id} 
                   className={`mb-6 ${message.role === 'assistant' ? 'text-white' : 'text-gray-300'}`}
