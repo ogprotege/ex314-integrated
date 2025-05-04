@@ -1,22 +1,26 @@
-import React from 'react';
-import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import '@/styles/globals.css';
-const inter = Inter({
-  subsets: ['latin']
-});
-export const metadata: Metadata = {
-  title: 'ex314.ai | Catholic Theological AI Assistant',
-  description: 'A Catholic theological AI assistant built with React and Next.js'
+import './globals.css';
+import { ChatProvider } from '@/context/ChatContext';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'EX314 AI',
+  description: 'A Biblical AI assistant',
 };
+
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
-  return <html lang="en">
-      <body className={`${inter.className} bg-dark-bg text-white font-segoe`}>
-        {children}
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <ChatProvider>
+          {children}
+        </ChatProvider>
       </body>
-    </html>;
+    </html>
+  );
 }
