@@ -1,9 +1,8 @@
-'use client';
-
 import React from 'react';
 
 export const Disclaimer = () => {
-  return <div className="w-full max-w-[800px] mx-auto p-5 bg-card-bg rounded-lg border border-[#383838] shadow-sm">
+  return (
+    <div className="w-full max-w-[800px] mx-auto p-5 bg-card-bg rounded-lg border border-[#383838] shadow-sm">
       <p className="text-xs text-gray-custom leading-relaxed">
         <strong className="text-accent-purple font-semibold">
           DISCLAIMER:
@@ -15,5 +14,6 @@ export const Disclaimer = () => {
         prayer, community, and with appropriate spiritual direction. ex314.ai is
         an independent Catholic initiative committed to truth and human dignity.
       </p>
-    </div>;
+    </div>
+  );
 };
