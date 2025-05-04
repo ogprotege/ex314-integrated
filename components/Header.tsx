@@ -1,9 +1,8 @@
-'use client';
-
 import React from 'react';
 
 export const Header = () => {
-  return <div className="max-w-[800px] mx-auto py-6 px-4">
+  return (
+    <div className="max-w-[800px] mx-auto py-6 px-4">
       <div className="flex flex-col items-center text-center gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-accent-purple bg-opacity-10 p-1.5 rounded-lg">
@@ -23,5 +22,6 @@ export const Header = () => {
           notapharisee@ex314.ai
         </a>
       </div>
-    </div>;
+    </div>
+  );
 };
