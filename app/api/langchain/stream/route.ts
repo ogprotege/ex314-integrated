@@ -1,52 +1,31 @@
-import { NextRequest } from 'next/server'
+// app/api/langchain/stream/route.ts
+import { NextRequest } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { message } = await req.json()
+  const { message, context } = await req.json();
 
-  const apiUrl = process.env.NEXT_PUBLIC_LLM_API_URL
-  const apiKey = process.env.NEXT_PUBLIC_LLM_API_KEY
-
-  if (!apiUrl) {
-    return new Response('Missing LLM API URL', { status: 500 })
-  }
-
-  const upstream = await fetch(`${apiUrl}/stream`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_LLM_API_URL}/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey && { Authorization: `Bearer ${apiKey}` })
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`
     },
-    body: JSON.stringify({ message })
-  })
+    body: JSON.stringify({
+      message,
+      context // 🧠 Include last N messages
+    })
+  });
 
-  if (!upstream.ok || !upstream.body) {
-    return new Response('Upstream error', { status: 502 })
+  if (!response.ok || !response.body) {
+    return new Response('Stream error', { status: 500 });
   }
 
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      const reader = upstream.body!.getReader()
-      const decoder = new TextDecoder()
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          controller.enqueue(new TextEncoder().encode(decoder.decode(value)))
-        }
-      } catch (error) {
-        controller.error(error)
-      } finally {
-        controller.close()
-      }
-    }
-  })
-
-  return new Response(readableStream, {
+  return new Response(response.body, {
+    status: 200,
     headers: {
-      'Content-Type': 'text/plain',
+      'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive'
     }
-  })
+  });
 }
