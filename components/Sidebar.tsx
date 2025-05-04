@@ -10,12 +10,37 @@ import {
   DownloadIcon,
   StarIcon,
   ArchiveIcon,
-  InboxIcon
+  InboxIcon,
+  SearchIcon
 } from 'lucide-react'
-import { SidebarSection } from '@/components/SidebarSection'
-import { UserProfile } from '@/components/UserProfile'
+import { SidebarSection } from './SidebarSection'
+import { UserProfile } from './UserProfile'
 import { useChat } from '@/context/ChatContext'
-import { ChatSearch } from '@/components/ChatSearch'
+
+// Inline ChatSearch component to avoid import issues
+const ChatSearch = () => {
+  const { searchMessages } = useChat()
+  const [query, setQuery] = useState('')
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value
+    setQuery(q)
+    searchMessages(q)
+  }
+
+  return (
+    <div className="px-4 mb-3 flex items-center gap-2">
+      <SearchIcon size={16} className="text-gray-400" />
+      <input
+        type="text"
+        value={query}
+        onChange={handleChange}
+        placeholder="Search chat messages or roles..."
+        className="w-full bg-input-bg text-white p-2 rounded text-sm border border-[#444] placeholder:text-gray-custom"
+      />
+    </div>
+  )
+}
 
 export const Sidebar = ({
   isCollapsed,
