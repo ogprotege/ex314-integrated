@@ -27,12 +27,16 @@ type ChatContextType = {
   updateChat: (id: string, update: Partial<Chat>) => void;
   deleteChat: (id: string) => void;
   exportChats: () => void;
+  searchMessages?: (query: string) => void;
+  visibleChats?: Chat[];
+  filterChats?: (status: 'all' | 'starred' | 'archived') => void;
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<Chat[]>([]);
+  const [visibleChats, setVisibleChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +58,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const stored = localStorage.getItem('chat_threads');
-    if (stored) setChats(JSON.parse(stored));
+    if (stored) {
+      const parsedChats = JSON.parse(stored);
+      setChats(parsedChats);
+      setVisibleChats(parsedChats);
+    }
   }, []);
 
   useEffect(() => {
@@ -77,6 +85,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const persistChats = (updated: Chat[]) => {
     setChats(updated);
+    setVisibleChats(updated);
     localStorage.setItem('chat_threads', JSON.stringify(updated));
   };
 
@@ -111,6 +120,36 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const selectChat = (id: string) => {
     setActiveChatId(id);
+  };
+
+  const filterChats = (filter: 'all' | 'starred' | 'archived') => {
+    if (filter === 'all') {
+      setVisibleChats(chats);
+    } else {
+      setVisibleChats(chats.filter(chat => chat.status === filter));
+    }
+  };
+
+  const searchMessages = (query: string) => {
+    if (!query.trim()) {
+      setVisibleChats(chats);
+      return;
+    }
+    
+    const q = query.toLowerCase();
+    const filtered = chats.filter(chat => {
+      // Search in title
+      if (chat.title.toLowerCase().includes(q)) return true;
+      
+      // Search in messages
+      const chatMessages = JSON.parse(localStorage.getItem(getStorageKey(chat.id)) || '[]');
+      return chatMessages.some((msg: Message) => 
+        msg.content.toLowerCase().includes(q) || 
+        msg.role.toLowerCase().includes(q)
+      );
+    });
+    
+    setVisibleChats(filtered);
   };
 
   const sendMessage = async (content: string) => {
@@ -194,6 +233,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     <ChatContext.Provider
       value={{
         chats,
+        visibleChats,
         messages,
         activeChatId,
         isLoading,
@@ -202,7 +242,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         selectChat,
         updateChat,
         deleteChat,
-        exportChats
+        exportChats,
+        searchMessages,
+        filterChats
       }}
     >
       {children}
