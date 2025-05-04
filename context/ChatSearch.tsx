@@ -1,53 +1,30 @@
-'use client';
+// components/ChatSearch.tsx
+'use client'
 
-import React, { useState } from 'react';
-import { useChat } from '@/context/ChatContext';
+import React, { useState } from 'react'
+import { useChat } from '@/context/ChatContext'
+import { SearchIcon } from 'lucide-react'
 
 export const ChatSearch = () => {
-  const { searchChats, selectChat } = useChat();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<
-    { chatId: string; match: { content: string; role: string; timestamp: string } }[]
-  >([]);
+  const { searchMessages } = useChat()
+  const [query, setQuery] = useState('')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value;
-    setQuery(q);
-    if (q.length > 1) {
-      const found = searchChats(q);
-      setResults(found);
-    } else {
-      setResults([]);
-    }
-  };
+    const q = e.target.value
+    setQuery(q)
+    searchMessages(q)
+  }
 
   return (
-    <div className="px-3 py-2 border-t border-[#444]">
+    <div className="px-4 mb-3 flex items-center gap-2">
+      <SearchIcon size={16} className="text-gray-400" />
       <input
         type="text"
-        placeholder="Search chats..."
         value={query}
         onChange={handleChange}
-        className="w-full p-2 rounded bg-input-bg text-sm text-white border border-[#444] mb-2"
+        placeholder="Search chat messages or roles..."
+        className="w-full bg-input-bg text-white p-2 rounded text-sm border border-[#444] placeholder:text-gray-custom"
       />
-      {results.length > 0 && (
-        <div className="max-h-40 overflow-auto custom-scrollbar space-y-1">
-          {results.map((r, idx) => (
-            <button
-              key={idx}
-              onClick={() => selectChat(r.chatId)}
-              className="block text-left w-full text-sm text-gray-custom hover:text-white hover:bg-[#2c2c2c] p-2 rounded transition-all"
-            >
-              <span className="block text-xs mb-1 opacity-60">
-                {new Date(r.match.timestamp).toLocaleString()}
-              </span>
-              {r.match.content.length > 120
-                ? r.match.content.slice(0, 120) + '...'
-                : r.match.content}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
-  );
-};
+  )
+}
