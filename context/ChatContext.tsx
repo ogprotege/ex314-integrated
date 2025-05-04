@@ -113,9 +113,16 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const deleteChat = (id: string) => {
     // Instead of removing the chat, update its status to 'deleted'
-    const updated = chats.map((c) => 
-      c.id === id ? { ...c, status: 'deleted' } : c
-    );
+    const updated = chats.map((chat) => {
+      if (chat.id === id) {
+        return {
+          ...chat,
+          status: 'deleted' as const // Use const assertion to fix TypeScript error
+        };
+      }
+      return chat;
+    });
+    
     persistChats(updated);
     
     if (id === activeChatId) {
