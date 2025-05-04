@@ -1,6 +1,7 @@
-'use client';
+// components/Sidebar.tsx
+'use client'
 
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
   PlusIcon,
   ChevronLeftIcon,
@@ -10,73 +11,43 @@ import {
   StarIcon,
   ArchiveIcon,
   InboxIcon
-} from 'lucide-react';
-import { SidebarSection } from './SidebarSection';
-import { UserProfile } from './UserProfile';
-
-type ChatStatus = 'active' | 'starred' | 'archived';
-
-interface Chat {
-  id: string;
-  title: string;
-  status: ChatStatus;
-}
-
-interface SidebarProps {
-  isCollapsed: boolean;
-  onToggle: () => void;
-  onLogout?: () => void;
-  chats: Chat[];
-  onNewChat: () => void;
-  onDeleteChat: (id: string) => void;
-  onSelectChat: (id: string) => void;
-  onUpdateChat: (id: string, update: Partial<Chat>) => void;
-  activeChatId: string | null;
-}
+} from 'lucide-react'
+import { SidebarSection } from './SidebarSection'
+import { UserProfile } from './UserProfile'
+import { useChat } from '@/context/ChatContext'
+import { ChatSearch } from './ChatSearch'
 
 export const Sidebar = ({
   isCollapsed,
   onToggle,
-  onLogout,
-  chats,
-  onNewChat,
-  onDeleteChat,
-  onSelectChat,
-  onUpdateChat,
-  activeChatId
-}: SidebarProps) => {
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [tab, setTab] = useState<'all' | 'starred' | 'archived'>('all');
+  onLogout
+}: {
+  isCollapsed: boolean
+  onToggle: () => void
+  onLogout?: () => void
+}) => {
+  const {
+    visibleChats,
+    activeChatId,
+    newChat,
+    selectChat,
+    updateChat,
+    deleteChat,
+    exportChats,
+    filterChats
+  } = useChat()
 
-  const isAdmin = typeof window !== 'undefined' && localStorage.getItem('user_is_admin') === 'true';
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const handleRename = (id: string, title: string) => {
-    onUpdateChat(id, { title });
-    setRenamingId(null);
-  };
+    updateChat(id, { title })
+    setRenamingId(null)
+  }
 
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(chats, null, 2)], {
-      type: 'application/json'
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ex314_chat_history.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const filtered = chats
-    .filter((c) => {
-      if (tab === 'starred') return c.status === 'starred';
-      if (tab === 'archived') return c.status === 'archived';
-      return c.status !== 'archived';
-    })
-    .filter((c) => c.title.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => (a.status === 'starred' ? -1 : 0));
+  const isAdmin =
+    typeof window !== 'undefined' &&
+    localStorage.getItem('user_id') === 'admin'
 
   return (
     <aside
@@ -108,54 +79,27 @@ export const Sidebar = ({
       {!isCollapsed && (
         <>
           <button
-            onClick={onNewChat}
+            onClick={newChat}
             className="flex items-center gap-2 bg-accent-purple text-white py-2.5 px-3 mx-4 mb-4 rounded-md font-medium text-left transition-colors hover:bg-purple-hover shadow-sm"
           >
             <PlusIcon size={16} />
             New Chat
           </button>
 
+          {/* 🗂 Status Tabs */}
           <div className="px-4 mb-3 flex gap-2">
-            <button
-              onClick={() => setTab('all')}
-              className={`flex-1 text-sm py-1 rounded ${
-                tab === 'all' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setTab('starred')}
-              className={`flex-1 text-sm py-1 rounded ${
-                tab === 'starred' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
-              }`}
-            >
-              ⭐ Starred
-            </button>
-            <button
-              onClick={() => setTab('archived')}
-              className={`flex-1 text-sm py-1 rounded ${
-                tab === 'archived' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
-              }`}
-            >
-              📦 Archived
-            </button>
+            <button onClick={() => filterChats('all')} className="flex-1 text-sm py-1 rounded bg-card-bg text-gray-300 hover:bg-[#333]">All</button>
+            <button onClick={() => filterChats('starred')} className="flex-1 text-sm py-1 rounded bg-card-bg text-yellow-300 hover:bg-[#333]">⭐ Starred</button>
+            <button onClick={() => filterChats('archived')} className="flex-1 text-sm py-1 rounded bg-card-bg text-blue-300 hover:bg-[#333]">📦 Archived</button>
           </div>
 
-          <div className="px-4 mb-3">
-            <input
-              type="text"
-              placeholder="Search chats..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-input-bg text-white p-2 rounded text-sm border border-[#444] placeholder:text-gray-custom"
-            />
-          </div>
+          {/* 🔍 Live Search */}
+          <ChatSearch />
 
           <nav className="flex-grow overflow-y-auto px-2 pb-4 custom-scrollbar">
             <SidebarSection title="Chat History" defaultOpen={true}>
               <ul>
-                {filtered.map((chat) => (
+                {visibleChats.map((chat) => (
                   <li key={chat.id} className="group flex items-center">
                     {renamingId === chat.id ? (
                       <input
@@ -164,30 +108,29 @@ export const Sidebar = ({
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={() => handleRename(chat.id, renameValue)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleRename(chat.id, renameValue);
+                          if (e.key === 'Enter') handleRename(chat.id, renameValue)
                         }}
                         className="flex-1 p-2 mb-1 rounded text-sm bg-input-bg border border-[#444] text-white"
                       />
                     ) : (
                       <button
                         onDoubleClick={() => {
-                          setRenamingId(chat.id);
-                          setRenameValue(chat.title);
+                          setRenamingId(chat.id)
+                          setRenameValue(chat.title)
                         }}
-                        onClick={() => onSelectChat(chat.id)}
+                        onClick={() => selectChat(chat.id)}
                         className={`flex-1 text-left p-2 mb-1 rounded text-sm truncate transition-colors ${
-                          activeChatId === chat.id
-                            ? 'bg-[#333333]'
-                            : 'hover:bg-[#333333]'
+                          activeChatId === chat.id ? 'bg-[#333333]' : 'hover:bg-[#333333]'
                         }`}
                       >
                         {chat.title}
                       </button>
                     )}
 
+                    {/* ⭐ */}
                     <button
                       onClick={() =>
-                        onUpdateChat(chat.id, {
+                        updateChat(chat.id, {
                           status: chat.status === 'starred' ? 'active' : 'starred'
                         })
                       }
@@ -197,9 +140,10 @@ export const Sidebar = ({
                       <StarIcon size={14} fill={chat.status === 'starred' ? 'currentColor' : 'none'} />
                     </button>
 
+                    {/* 📦 Archive */}
                     <button
                       onClick={() =>
-                        onUpdateChat(chat.id, {
+                        updateChat(chat.id, {
                           status: chat.status === 'archived' ? 'active' : 'archived'
                         })
                       }
@@ -213,8 +157,9 @@ export const Sidebar = ({
                       )}
                     </button>
 
+                    {/* ❌ */}
                     <button
-                      onClick={() => onDeleteChat(chat.id)}
+                      onClick={() => deleteChat(chat.id)}
                       className="ml-1 text-gray-400 hover:text-red-400 transition"
                       title="Delete"
                     >
@@ -229,7 +174,7 @@ export const Sidebar = ({
           {isAdmin && (
             <div className="px-4 mb-4">
               <button
-                onClick={handleExport}
+                onClick={exportChats}
                 className="w-full flex items-center gap-2 justify-center text-sm py-2 rounded bg-card-bg hover:bg-[#2a2a2a] border border-[#444] text-gray-300"
               >
                 <DownloadIcon size={14} />
@@ -242,5 +187,5 @@ export const Sidebar = ({
         </>
       )}
     </aside>
-  );
-};
+  )
+}
