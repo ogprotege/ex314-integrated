@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       message,
-      context // 🧠 Include last N messages
+      context // 🧠 Include last 100 messages
     })
   });
 
