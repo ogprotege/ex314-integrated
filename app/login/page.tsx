@@ -32,21 +32,31 @@ export default function LoginPage() {
     setError('');
     
     // Simple authentication for demo
-    // In production, this would call an API
     setTimeout(() => {
       if (password === 'jesus' || password === 'admin') {
-        localStorage.setItem('isAuthenticated', 'true');
-        
-        // Set admin user if admin password used
+        // Set user_id before authentication flag
         if (password === 'admin') {
           localStorage.setItem('user_id', 'admin');
+        } else {
+          // For non-admin users, generate random ID if they don't have one
+          if (!localStorage.getItem('user_id')) {
+            // Use a simple random ID for user
+            const randomId = 'user_' + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('user_id', randomId);
+          }
         }
         
-        router.push('/');
+        // Set authentication flag last
+        localStorage.setItem('isAuthenticated', 'true');
+        
+        // Delay the redirect slightly to ensure localStorage is set
+        setTimeout(() => {
+          router.push('/');
+        }, 100);
       } else {
         setError('Invalid password.');
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }, 1000);
   };
 
