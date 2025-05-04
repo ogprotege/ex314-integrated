@@ -6,64 +6,76 @@ import { InitialView } from '@/components/InitialView';
 import { ChatView } from '@/components/ChatView';
 import { Header } from '@/components/Header';
 import { useRouter } from 'next/navigation';
-import type { Message } from '@/lib/types';
 
-type ChatThread = {
+export type Message = {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: Date;
+};
+
+export type Chat = {
   id: string;
   title: string;
-  messages: Message[];
+  status: 'active' | 'starred' | 'archived';
 };
 
 export default function Home() {
   const router = useRouter();
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [chatThreads, setChatThreads] = useState<ChatThread[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
 
-  // Load user prefs
-  const aiTone = localStorage.getItem('ai_tone') || 'formal';
-  const markdownEnabled = localStorage.getItem('markdown_enabled') !== 'false';
+  const [chats, setChats] = useState<Chat[]>(() => {
+    const stored = localStorage.getItem('chat_threads');
+    return stored ? JSON.parse(stored) : [];
+  });
 
-  // Load saved chats on init
-  useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
-    if (!isLoggedIn) {
-      router.push('/login');
-      return;
-    }
-    setIsAuthenticated(true);
-
-    const savedThreads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
-    const lastActive = localStorage.getItem('active_chat_id');
-    setChatThreads(savedThreads);
-    setActiveChatId(lastActive || (savedThreads[0]?.id ?? null));
-  }, [router]);
-
-  const activeThread = chatThreads.find((t) => t.id === activeChatId);
-  const messages = activeThread?.messages || [];
-
-  // Save to localStorage
-  const saveThreads = (threads: ChatThread[], activeId: string) => {
-    setChatThreads(threads);
-    setActiveChatId(activeId);
-    localStorage.setItem('chat_threads', JSON.stringify(threads));
-    localStorage.setItem('active_chat_id', activeId);
+  const onUpdateChat = (id: string, update: Partial<Chat>) => {
+    setChats((prev) => {
+      const updated = prev.map((chat) =>
+        chat.id === id ? { ...chat, ...update } : chat
+      );
+      localStorage.setItem('chat_threads', JSON.stringify(updated));
+      return updated;
+    });
   };
 
-  const startNewChat = () => {
-    const newId = `chat_${Date.now()}`;
-    const newThread: ChatThread = {
+  const onDeleteChat = (id: string) => {
+    const updated = chats.filter((chat) => chat.id !== id);
+    setChats(updated);
+    localStorage.setItem('chat_threads', JSON.stringify(updated));
+    if (activeChatId === id) {
+      setActiveChatId(null);
+      setMessages([]);
+    }
+  };
+
+  const onSelectChat = (id: string) => {
+    setActiveChatId(id);
+    const history = localStorage.getItem(`chat_history_${id}`);
+    setMessages(history ? JSON.parse(history) : []);
+  };
+
+  const handleNewChat = () => {
+    const newId = Date.now().toString();
+    const newChat: Chat = {
       id: newId,
-      title: 'New Chat',
-      messages: []
+      title: 'Untitled Chat',
+      status: 'active'
     };
-    saveThreads([newThread, ...chatThreads], newId);
+    const updated = [newChat, ...chats];
+    setChats(updated);
+    localStorage.setItem('chat_threads', JSON.stringify(updated));
+    setActiveChatId(newId);
+    setMessages([]);
   };
 
   const handleSendMessage = async (content: string) => {
+    if (!activeChatId) return;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -71,60 +83,45 @@ export default function Home() {
       timestamp: new Date()
     };
 
-    const currentThread = chatThreads.find((t) => t.id === activeChatId);
-    if (!currentThread) return;
-
-    const updatedMessages = [...currentThread.messages, userMessage];
-    const updatedThreads = chatThreads.map((t) =>
-      t.id === currentThread.id ? { ...t, messages: updatedMessages } : t
-    );
-
-    // Auto-title the chat
-    if (currentThread.title === 'New Chat' && content.length >= 8) {
-      const firstLine = content.split('\n')[0].slice(0, 40);
-      updatedThreads.find((t) => t.id === currentThread.id)!.title = firstLine;
-    }
-
-    saveThreads(updatedThreads, currentThread.id);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(updatedMessages));
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
+    try {
+      const pastContext = updatedMessages.slice(-10); // Memory-aware chunk
+      const response = await fetch('/api/langchain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          context: pastContext // 👈 included in the API
+        })
+      });
 
-    const aiResponse = generateResponse(content, aiTone);
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      content: markdownEnabled ? formatMarkdown(aiResponse) : aiResponse,
-      role: 'assistant',
-      timestamp: new Date()
-    };
+      const data = await response.json();
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response,
+        role: 'assistant',
+        timestamp: new Date()
+      };
 
-    const finalMessages = [...updatedMessages, assistantMessage];
-    const finalThreads = chatThreads.map((t) =>
-      t.id === currentThread.id ? { ...t, messages: finalMessages } : t
-    );
-
-    setIsLoading(false);
-    saveThreads(finalThreads, currentThread.id);
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem('isAuthenticated');
-    router.push('/login');
-  };
-
-  const switchToChat = (id: string) => {
-    const threadExists = chatThreads.some((t) => t.id === id);
-    if (threadExists) {
-      setActiveChatId(id);
-      localStorage.setItem('active_chat_id', id);
+      const newMessages = [...updatedMessages, aiMessage];
+      setMessages(newMessages);
+      localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(newMessages));
+    } catch (err) {
+      console.error('AI Error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const deleteChat = (id: string) => {
-    const remaining = chatThreads.filter((t) => t.id !== id);
-    const newActive = remaining[0]?.id || null;
-    saveThreads(remaining, newActive);
-  };
+  useEffect(() => {
+    const isLoggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
+    if (!isLoggedIn) router.push('/login');
+    else setIsAuthenticated(true);
+  }, [router]);
 
   if (!isAuthenticated) {
     return (
@@ -140,12 +137,16 @@ export default function Home() {
         <Sidebar
           isCollapsed={isSidebarCollapsed}
           onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          onLogout={handleLogout}
-          chats={chatThreads}
-          onSelectChat={switchToChat}
-          onDeleteChat={deleteChat}
-          onNewChat={startNewChat}
+          onLogout={() => {
+            sessionStorage.removeItem('isAuthenticated');
+            router.push('/login');
+          }}
+          chats={chats}
           activeChatId={activeChatId}
+          onNewChat={handleNewChat}
+          onDeleteChat={onDeleteChat}
+          onSelectChat={onSelectChat}
+          onUpdateChat={onUpdateChat}
         />
         <main className="flex-grow flex flex-col h-full overflow-hidden">
           <Header />
@@ -162,16 +163,4 @@ export default function Home() {
       </div>
     </div>
   );
-}
-
-function generateResponse(input: string, tone: string): string {
-  if (tone === 'casual') return "Cool! Here's a quick answer for ya:";
-  if (tone === 'theological') return "In light of Catholic theology, we might say:\n\n1. ...\n2. ...";
-  return "Thank you for your question. Here's how I see it:";
-}
-
-function formatMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/_(.*?)_/g, '<em>$1</em>');
 }
