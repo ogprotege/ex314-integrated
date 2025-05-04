@@ -1,8 +1,5 @@
-import { Inter } from 'next/font/google';
-import './globals.css';
+import '../styles/global.css';
 import { ChatProvider } from '@/context/ChatContext';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'EX314 AI',
@@ -16,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <ChatProvider>
           {children}
         </ChatProvider>
