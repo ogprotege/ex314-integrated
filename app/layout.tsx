@@ -1,4 +1,4 @@
-import '../styles/global.css';
+import './global.css';
 import { ChatProvider } from '@/context/ChatContext';
 
 export const metadata = {
