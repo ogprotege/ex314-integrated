@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   const { message, context } = await req.json();
-  const pastContext = updatedMessages.slice(-10); // 🔁 just change to -25, -50, etc.
+
   const response = await fetch(process.env.NEXT_PUBLIC_LLM_API_URL!, {
     method: 'POST',
     headers: {
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     },
     body: JSON.stringify({
       message,
-      context // ✅ send last 10 messages for memory-aware logic
+      context // ✅ already sliced client-side
     })
   });
 
