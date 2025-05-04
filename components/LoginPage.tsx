@@ -1,18 +1,21 @@
+'use client';
+
 import React, { useState } from 'react';
+
 interface LoginPageProps {
   onLogin: (username: string, password: string) => void;
   error?: string;
 }
-export const LoginPage = ({
-  onLogin,
-  error
-}: LoginPageProps) => {
+
+export const LoginPage = ({ onLogin, error }: LoginPageProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onLogin(username, password);
   };
+
   return <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md border-2 border-accent-purple border-opacity-30 rounded-lg p-8 bg-[#131419] shadow-md">
         <div className="text-center mb-8">
