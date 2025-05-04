@@ -9,6 +9,7 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
+// Create the Supabase client
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Create a service client for server-side operations that require more privileges
@@ -20,4 +21,5 @@ export const getServiceSupabase = () => {
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 
+// Export the Supabase client as default export
 export default supabase
