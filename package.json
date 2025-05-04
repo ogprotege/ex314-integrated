@@ -1,28 +1,30 @@
 {
   "name": "ex314-ai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "next lint"
   },
   "dependencies": {
-    "next": "^13.5.0",
+    "@supabase/supabase-js": "^2.39.3",
+    "next": "13.5.11",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "lucide-react": "^0.441.0"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "autoprefixer": "^10.4.16",
     "eslint": "^8.56.0",
-    "eslint-config-next": "^13.5.0",
-    "@typescript-eslint/eslint-plugin": "^5.54.0",
-    "@typescript-eslint/parser": "^5.54.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "typescript": "^5.5.4",
+    "eslint-config-next": "13.5.11",
+    "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.24"
+    "typescript": "^5.3.3"
   }
 }
