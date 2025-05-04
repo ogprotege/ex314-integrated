@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
 
 export type Message = {
   id: string;
@@ -35,50 +34,51 @@ type ChatContextType = {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
+// Add browser check
+const isBrowser = typeof window !== 'undefined';
+
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [visibleChats, setVisibleChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const [userId, setUserId] = useState<string>('');
 
-  // Set isClient to true once component is mounted
+  const userId = getUserId();
+
+  function getUserId() {
+    // Add check before localStorage access
+    if (!isBrowser) return '';
+    
+    let id = localStorage.getItem('user_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('user_id', id);
+    }
+    return id;
+  }
+
+  function getStorageKey(chatId: string) {
+    return `chat_history_${chatId}_${userId}`;
+  }
+
   useEffect(() => {
-    setIsClient(true);
+    // Add check before localStorage access
+    if (!isBrowser) return;
+    
+    const stored = localStorage.getItem('chat_threads');
+    if (stored) {
+      const parsedChats = JSON.parse(stored);
+      setChats(parsedChats);
+      setVisibleChats(parsedChats);
+    }
   }, []);
 
-  // Handle user ID only after client-side rendering
   useEffect(() => {
-    if (!isClient) return;
-    
-    // Now it's safe to access localStorage
-    const storedUserId = localStorage.getItem('user_id');
-    if (storedUserId) {
-      setUserId(storedUserId);
-    } else {
-      const newUserId = uuidv4();
-      localStorage.setItem('user_id', newUserId);
-      setUserId(newUserId);
-    }
-  }, [isClient]);
-
-  // Only load chats after component has mounted and userId is set
-  useEffect(() => {
-    if (isClient && userId) {
-      const stored = localStorage.getItem('chat_threads');
-      if (stored) {
-        const parsedChats = JSON.parse(stored);
-        setChats(parsedChats);
-        setVisibleChats(parsedChats);
-      }
-    }
-  }, [isClient, userId]);
-
-  // Load messages when activeChatId changes
-  useEffect(() => {
-    if (isClient && userId && activeChatId) {
+    if (activeChatId) {
+      // Add check before localStorage access
+      if (!isBrowser) return;
+      
       const local = localStorage.getItem(getStorageKey(activeChatId));
       if (local) {
         setMessages(JSON.parse(local));
@@ -93,40 +93,40 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           });
       }
     }
-  }, [activeChatId, isClient, userId]);
-
-  function getStorageKey(chatId: string) {
-    if (!userId) return '';
-    return `chat_history_${chatId}_${userId}`;
-  }
+  }, [activeChatId]);
 
   const persistChats = (updated: Chat[]) => {
-    if (!isClient) return;
     setChats(updated);
     setVisibleChats(updated);
-    localStorage.setItem('chat_threads', JSON.stringify(updated));
+    
+    // Add check before localStorage access
+    if (isBrowser) {
+      localStorage.setItem('chat_threads', JSON.stringify(updated));
+    }
   };
 
   const updateChat = (id: string, update: Partial<Chat>) => {
-    if (!isClient) return;
     const updated = chats.map((c) => (c.id === id ? { ...c, ...update } : c));
     persistChats(updated);
   };
 
   const deleteChat = (id: string) => {
-    if (!isClient) return;
     const updated = chats.filter((c) => c.id !== id);
     persistChats(updated);
     if (id === activeChatId) {
       setActiveChatId(null);
       setMessages([]);
     }
-    localStorage.removeItem(getStorageKey(id));
+    
+    // Add check before localStorage access
+    if (isBrowser) {
+      localStorage.removeItem(getStorageKey(id));
+    }
+    
     supabase.from('messages').delete().eq('chat_id', id);
   };
 
   const newChat = () => {
-    if (!isClient) return;
     const id = Date.now().toString();
     const chat: Chat = {
       id,
@@ -152,7 +152,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const searchMessages = (query: string) => {
-    if (!isClient) return;
     if (!query.trim()) {
       setVisibleChats(chats);
       return;
@@ -164,6 +163,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       if (chat.title.toLowerCase().includes(q)) return true;
       
       // Search in messages
+      // Add check before localStorage access
+      if (!isBrowser) return false;
+      
       const chatMessages = JSON.parse(localStorage.getItem(getStorageKey(chat.id)) || '[]');
       return chatMessages.some((msg: Message) => 
         msg.content.toLowerCase().includes(q) || 
@@ -175,10 +177,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const sendMessage = async (content: string) => {
-    if (!isClient || !activeChatId || !userId) return;
+    if (!activeChatId) return;
 
     const userMessage: Message = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       content,
       role: 'user',
       timestamp: new Date()
@@ -186,7 +188,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(updatedMessages));
+    
+    // Add check before localStorage access
+    if (isBrowser) {
+      localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(updatedMessages));
+    }
+    
     setIsLoading(true);
 
     await supabase.from('messages').insert({
@@ -208,7 +215,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       const data = await res.json();
 
       const aiMessage: Message = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         content: data.response,
         role: 'assistant',
         timestamp: new Date()
@@ -216,7 +223,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
       const allMessages = [...updatedMessages, aiMessage];
       setMessages(allMessages);
-      localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
+      
+      // Add check before localStorage access
+      if (isBrowser) {
+        localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
+      }
 
       await supabase.from('messages').insert({
         chat_id: activeChatId,
@@ -233,7 +244,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const exportChats = () => {
-    if (!isClient) return;
+    // Add check before localStorage access
+    if (!isBrowser) return;
     
     if (userId !== 'admin') return alert('Only admin can export');
 
