@@ -12,10 +12,10 @@ import {
   ArchiveIcon,
   InboxIcon
 } from 'lucide-react'
-import { SidebarSection } from './SidebarSection'
-import { UserProfile } from './UserProfile'
+import { SidebarSection } from '@/components/SidebarSection'
+import { UserProfile } from '@/components/UserProfile'
 import { useChat } from '@/context/ChatContext'
-import { ChatSearch } from './ChatSearch'
+import { ChatSearch } from '@/components/ChatSearch'
 
 export const Sidebar = ({
   isCollapsed,
