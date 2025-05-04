@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+
 export const Disclaimer = () => {
   return <div className="w-full max-w-[800px] mx-auto p-5 bg-card-bg rounded-lg border border-[#383838] shadow-sm">
       <p className="text-xs text-gray-custom leading-relaxed">
