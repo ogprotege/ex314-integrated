@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// Browser check for server-side rendering
+const isBrowser = typeof window !== 'undefined';
+
 export type Message = {
   id: string;
   content: string;
@@ -14,6 +17,7 @@ export type Chat = {
   id: string;
   title: string;
   status: 'active' | 'starred' | 'archived';
+  preview?: string;
 };
 
 type ChatContextType = {
@@ -33,9 +37,6 @@ type ChatContextType = {
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
-
-// Add browser check
-const isBrowser = typeof window !== 'undefined';
 
 export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -123,6 +124,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem(getStorageKey(id));
     }
     
+    // If using Supabase
     supabase.from('messages').delete().eq('chat_id', id);
   };
 
@@ -131,7 +133,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     const chat: Chat = {
       id,
       title: 'Untitled Chat',
-      status: 'active'
+      status: 'active',
+      preview: ''
     };
     const updated = [chat, ...chats];
     persistChats(updated);
@@ -152,6 +155,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const searchMessages = (query: string) => {
+    if (!isBrowser) return;
+    
     if (!query.trim()) {
       setVisibleChats(chats);
       return;
@@ -161,6 +166,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     const filtered = chats.filter(chat => {
       // Search in title
       if (chat.title.toLowerCase().includes(q)) return true;
+      
+      // Search in preview
+      if (chat.preview && chat.preview.toLowerCase().includes(q)) return true;
       
       // Search in messages
       // Add check before localStorage access
@@ -196,6 +204,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     
     setIsLoading(true);
 
+    // If using Supabase
     await supabase.from('messages').insert({
       chat_id: activeChatId,
       user_id: userId,
@@ -205,7 +214,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     try {
-      const context = updatedMessages; // 🧠 Full message context
+      const context = updatedMessages; // Full message context
       const res = await fetch('/api/langchain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -224,11 +233,21 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       const allMessages = [...updatedMessages, aiMessage];
       setMessages(allMessages);
       
+      // Generate a preview from the user's message
+      const preview = content.length > 64 ? content.slice(0, 64) + '...' : content;
+      
+      // Update the chat with the preview
+      const updatedChat = chats.map(chat => 
+        chat.id === activeChatId ? { ...chat, preview } : chat
+      );
+      persistChats(updatedChat);
+      
       // Add check before localStorage access
       if (isBrowser) {
         localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
       }
 
+      // If using Supabase
       await supabase.from('messages').insert({
         chat_id: activeChatId,
         user_id: userId,
