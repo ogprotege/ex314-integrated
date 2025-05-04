@@ -25,6 +25,7 @@ type ChatContextType = {
   selectChat: (id: string) => void;
   updateChat: (id: string, update: Partial<Chat>) => void;
   deleteChat: (id: string) => void;
+  exportChats: () => void;
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -35,6 +36,19 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // 🧠 ID helpers
+  const getUserId = () => {
+    let id = localStorage.getItem('user_id');
+    if (!id) {
+      id = crypto.randomUUID(); // native UUID fallback
+      localStorage.setItem('user_id', id);
+    }
+    return id;
+  };
+
+  const getStorageKey = (chatId: string) => `chat_history_${chatId}_${getUserId()}`;
+
+  // 📥 Load chats
   useEffect(() => {
     const stored = localStorage.getItem('chat_threads');
     if (stored) setChats(JSON.parse(stored));
@@ -42,7 +56,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (activeChatId) {
-      const history = localStorage.getItem(`chat_history_${activeChatId}`);
+      const history = localStorage.getItem(getStorageKey(activeChatId));
       setMessages(history ? JSON.parse(history) : []);
     }
   }, [activeChatId]);
@@ -81,7 +95,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const selectChat = (id: string) => {
     setActiveChatId(id);
-    const history = localStorage.getItem(`chat_history_${id}`);
+    const history = localStorage.getItem(getStorageKey(id));
     setMessages(history ? JSON.parse(history) : []);
   };
 
@@ -97,11 +111,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(updatedMessages));
+    localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(updatedMessages));
     setIsLoading(true);
 
     try {
-      const context = updatedMessages.slice(-10); // adjust as needed
+      const context = updatedMessages; // full context, no slice
       const res = await fetch('/api/langchain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,12 +133,39 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
       const allMessages = [...updatedMessages, aiMessage];
       setMessages(allMessages);
-      localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(allMessages));
+      localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
     } catch (err) {
       console.error('AI ERROR:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 🛡 Admin-only export
+  const exportChats = () => {
+    const userId = getUserId();
+    if (userId !== 'admin') {
+      alert('Unauthorized export.');
+      return;
+    }
+
+    const exportData: Record<string, Message[]> = {};
+    chats.forEach((chat) => {
+      const key = getStorageKey(chat.id);
+      const data = localStorage.getItem(key);
+      if (data) exportData[chat.title] = JSON.parse(data);
+    });
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `ex314_user_export.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -138,7 +179,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         newChat,
         selectChat,
         updateChat,
-        deleteChat
+        deleteChat,
+        exportChats
       }}
     >
       {children}
