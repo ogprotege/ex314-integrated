@@ -1,166 +1,150 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { InitialView } from '@/components/InitialView';
-import { ChatView } from '@/components/ChatView';
-import { Header } from '@/components/Header';
+import { ChatInput } from '@/components/ChatInput';
 import { useRouter } from 'next/navigation';
+import { useChat } from '@/context/ChatContext';
 
-export type Message = {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-};
-
-export type Chat = {
-  id: string;
-  title: string;
-  status: 'active' | 'starred' | 'archived';
-};
-
-export default function Home() {
+export default function HomePage() {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-
-  const [chats, setChats] = useState<Chat[]>(() => {
-    const stored = localStorage.getItem('chat_threads');
-    return stored ? JSON.parse(stored) : [];
-  });
-
-  const onUpdateChat = (id: string, update: Partial<Chat>) => {
-    setChats((prev) => {
-      const updated = prev.map((chat) =>
-        chat.id === id ? { ...chat, ...update } : chat
-      );
-      localStorage.setItem('chat_threads', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const onDeleteChat = (id: string) => {
-    const updated = chats.filter((chat) => chat.id !== id);
-    setChats(updated);
-    localStorage.setItem('chat_threads', JSON.stringify(updated));
-    if (activeChatId === id) {
-      setActiveChatId(null);
-      setMessages([]);
-    }
-  };
-
-  const onSelectChat = (id: string) => {
-    setActiveChatId(id);
-    const history = localStorage.getItem(`chat_history_${id}`);
-    setMessages(history ? JSON.parse(history) : []);
-  };
-
-  const handleNewChat = () => {
-    const newId = Date.now().toString();
-    const newChat: Chat = {
-      id: newId,
-      title: 'Untitled Chat',
-      status: 'active'
-    };
-    const updated = [newChat, ...chats];
-    setChats(updated);
-    localStorage.setItem('chat_threads', JSON.stringify(updated));
-    setActiveChatId(newId);
-    setMessages([]);
-  };
-
-  const handleSendMessage = async (content: string) => {
-    if (!activeChatId) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      role: 'user',
-      timestamp: new Date()
-    };
-
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(updatedMessages));
-    setIsLoading(true);
-
-    try {
-      const pastContext = updatedMessages.slice(-10); // Memory-aware chunk
-      const response = await fetch('/api/langchain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: content,
-          context: pastContext // 👈 included in the API
-        })
-      });
-
-      const data = await response.json();
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: data.response,
-        role: 'assistant',
-        timestamp: new Date()
-      };
-
-      const newMessages = [...updatedMessages, aiMessage];
-      setMessages(newMessages);
-      localStorage.setItem(`chat_history_${activeChatId}`, JSON.stringify(newMessages));
-    } catch (err) {
-      console.error('AI Error:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
+  const { 
+    chats, 
+    visibleChats,
+    messages, 
+    activeChatId, 
+    isLoading, 
+    sendMessage, 
+    newChat, 
+    selectChat, 
+    updateChat, 
+    deleteChat 
+  } = useChat();
 
   useEffect(() => {
-    const isLoggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
-    if (!isLoggedIn) router.push('/login');
-    else setIsAuthenticated(true);
+    // Check login status
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    setIsLoggedIn(isAuthenticated);
+    setIsLoaded(true);
+    
+    // Redirect if not logged in
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
   }, [router]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-dark-bg">
-        Loading...
-      </div>
-    );
+  // Handle sidebar toggle
+  const handleToggle = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+  
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    setIsLoggedIn(false);
+    router.push('/login');
+  };
+  
+  // Handle new chat creation
+  const handleNewChat = () => {
+    newChat();
+  };
+  
+  // Handle deleting a chat
+  const onDeleteChat = (id: string) => {
+    deleteChat(id);
+  };
+  
+  // Handle selecting a chat
+  const onSelectChat = (id: string) => {
+    selectChat(id);
+  };
+  
+  // Handle updating a chat
+  const onUpdateChat = (id: string, update: any) => {
+    updateChat(id, update);
+  };
+  
+  // If still checking login status or not logged in, show loading
+  if (!isLoaded || !isLoggedIn) {
+    return null;
   }
 
   return (
-    <div className="flex flex-col w-full h-screen bg-dark-bg text-white font-segoe">
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          onLogout={() => {
-            sessionStorage.removeItem('isAuthenticated');
-            router.push('/login');
-          }}
-          chats={chats}
-          activeChatId={activeChatId}
-          onNewChat={handleNewChat}
-          onDeleteChat={onDeleteChat}
-          onSelectChat={onSelectChat}
-          onUpdateChat={onUpdateChat}
-        />
-        <main className="flex-grow flex flex-col h-full overflow-hidden">
-          <Header />
-          {messages.length === 0 ? (
-            <InitialView onSendMessage={handleSendMessage} />
+    <div className="flex h-screen bg-dark-bg text-white">
+      {/* Sidebar */}
+      <Sidebar
+        isCollapsed={isCollapsed}
+        onToggle={handleToggle}
+        onLogout={handleLogout}
+      />
+      
+      {/* Main Chat Area */}
+      <main className="flex-grow h-full flex flex-col">
+        {/* Chat Messages */}
+        <div className="flex-grow overflow-y-auto p-6">
+          {!activeChatId ? (
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto text-gray-400">
+              <h2 className="text-xl font-bold mb-2">Welcome to EX314</h2>
+              <p className="mb-6">Start a new chat or select an existing conversation to begin.</p>
+              <button 
+                onClick={handleNewChat}
+                className="bg-accent-purple hover:bg-purple-hover text-white px-4 py-2 rounded-md transition-colors"
+              >
+                New Chat
+              </button>
+            </div>
           ) : (
-            <ChatView
-              messages={messages}
-              isLoading={isLoading}
-              onSendMessage={handleSendMessage}
-            />
+            <div className="max-w-4xl mx-auto w-full">
+              {messages.map((message, index) => (
+                <div 
+                  key={message.id} 
+                  className={`mb-6 ${message.role === 'assistant' ? 'text-white' : 'text-gray-300'}`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      message.role === 'assistant' ? 'bg-accent-purple' : 'bg-gray-700'
+                    }`}>
+                      {message.role === 'assistant' ? '✝' : 'Y'}
+                    </div>
+                    <div className="flex-grow">
+                      <div className="text-sm text-gray-500 mb-1 flex justify-between">
+                        <span>{message.role === 'assistant' ? 'EX314' : 'You'}</span>
+                        <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <div className="prose prose-invert max-w-none">
+                        {message.content}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {isLoading && (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-pulse flex gap-2">
+                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
+                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
+                    <div className="w-2 h-2 bg-accent-purple rounded-full"></div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </main>
-      </div>
+        </div>
+        
+        {/* Chat Input */}
+        {activeChatId && (
+          <div className="border-t border-[#222222] p-4">
+            <ChatInput onSendMessage={sendMessage} />
+          </div>
+        )}
+      </main>
     </div>
   );
 }
