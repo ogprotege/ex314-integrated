@@ -22,7 +22,8 @@ export const ChatHistoryDrawer = ({
       .filter((chat) => {
         if (filter === 'starred') return chat.status === 'starred';
         if (filter === 'archived') return chat.status === 'archived';
-        if (filter === 'deleted') return chat.status === 'deleted';
+        // For 'deleted', we need to check if status is any string that matches 'deleted'
+        if (filter === 'deleted') return chat.status && chat.status.toLowerCase() === 'deleted';
         return true; // 'all' filter
       })
       .filter((chat) =>
