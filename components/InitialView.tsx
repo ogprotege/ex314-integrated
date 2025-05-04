@@ -1,12 +1,14 @@
+'use client';
+
 import React from 'react';
-import { ChatInput } from './ChatInput';
-import { Disclaimer } from './Disclaimer';
+import { ChatInput } from '@/components/ChatInput';
+import { Disclaimer } from '@/components/Disclaimer';
+
 interface InitialViewProps {
   onSendMessage: (message: string) => void;
 }
-export const InitialView = ({
-  onSendMessage
-}: InitialViewProps) => {
+
+export const InitialView = ({ onSendMessage }: InitialViewProps) => {
   return <div className="flex-grow flex flex-col">
       <div className="flex-grow flex flex-col justify-center items-center p-6 md:p-8 overflow-auto">
         <div className="w-full max-w-[800px] mt-12 md:mt-24 mb-8">
