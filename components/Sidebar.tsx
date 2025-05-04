@@ -5,66 +5,70 @@ import {
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ArchiveIcon,
   Trash2Icon,
-  PencilIcon,
-  CheckIcon
+  DownloadIcon
 } from 'lucide-react';
-import { SidebarSection } from '@/components/SidebarSection';
-import { UserProfile } from '@/components/UserProfile';
+
+import { SidebarSection } from './SidebarSection';
+import { UserProfile } from './UserProfile';
 
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onLogout?: () => void;
+  chats: { id: string; title: string }[];
+  onNewChat: () => void;
+  onDeleteChat: (id: string) => void;
+  onSelectChat: (id: string) => void;
+  activeChatId: string | null;
 }
 
-type ChatItem = {
-  id: string;
-  name: string;
-  archived?: boolean;
-};
+export const Sidebar = ({
+  isCollapsed,
+  onToggle,
+  onLogout,
+  chats,
+  onNewChat,
+  onDeleteChat,
+  onSelectChat,
+  activeChatId
+}: SidebarProps) => {
+  const [showAllChats, setShowAllChats] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-export const Sidebar = ({ isCollapsed, onToggle, onLogout }: SidebarProps) => {
-  const [chats, setChats] = useState<ChatItem[]>([
-    { id: '1', name: 'Theological Discussion on Grace' },
-    { id: '2', name: 'Church Fathers Study' },
-    { id: '3', name: 'Vatican II Documents' },
-    { id: '4', name: 'Biblical Interpretation' },
-    { id: '5', name: 'Liturgical Questions' },
-    { id: '6', name: 'Patristic Readings', archived: true },
-    { id: '7', name: 'Moral Theology', archived: true }
-  ]);
+  const isAdmin =
+    typeof window !== 'undefined' &&
+    localStorage.getItem('user_is_admin') === 'true';
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-
-  const handleRename = (id: string, newName: string) => {
-    setChats((prev) =>
-      prev.map((chat) => (chat.id === id ? { ...chat, name: newName } : chat))
+  const handleRename = (id: string, title: string) => {
+    const updated = chats.map((chat) =>
+      chat.id === id ? { ...chat, title } : chat
     );
-    setEditingId(null);
+    localStorage.setItem('chat_threads', JSON.stringify(updated));
+    setRenamingId(null);
   };
 
-  const handleArchive = (id: string) => {
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === id ? { ...chat, archived: !chat.archived } : chat
-      )
-    );
+  const handleExport = () => {
+    const threads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
+    const blob = new Blob([JSON.stringify(threads, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ex314_chat_history.json';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleDelete = (id: string) => {
-    setChats((prev) => prev.filter((chat) => chat.id !== id));
-  };
+  const filteredChats = chats.filter((chat) =>
+    chat.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleStartEdit = (id: string, current: string) => {
-    setEditingId(id);
-    setEditValue(current);
-  };
-
-  const displayedChats = chats.filter((chat) => !chat.archived);
-  const archivedChats = chats.filter((chat) => chat.archived);
+  const recentChats = filteredChats.slice(0, 7);
+  const olderChats = filteredChats.slice(7);
 
   return (
     <aside
@@ -76,7 +80,11 @@ export const Sidebar = ({ isCollapsed, onToggle, onLogout }: SidebarProps) => {
         {!isCollapsed ? (
           <>
             <div className="w-7 h-7 bg-accent-purple rounded flex items-center justify-center shadow-sm">
-              <img src="/jerusalem-cross.png" alt="Jerusalem Cross" className="w-5 h-5" />
+              <img
+                src="/jerusalem-cross.png"
+                alt="Jerusalem Cross"
+                className="w-5 h-5"
+              />
             </div>
             <span className="text-base font-semibold">AI Assistant</span>
           </>
@@ -90,83 +98,124 @@ export const Sidebar = ({ isCollapsed, onToggle, onLogout }: SidebarProps) => {
           className="ml-auto p-1.5 hover:bg-card-bg rounded-lg transition-colors"
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed ? <ChevronRightIcon size={18} /> : <ChevronLeftIcon size={18} />}
+          {isCollapsed ? (
+            <ChevronRightIcon size={18} />
+          ) : (
+            <ChevronLeftIcon size={18} />
+          )}
         </button>
       </div>
 
       {!isCollapsed && (
         <>
-          <button className="flex items-center gap-2 bg-accent-purple text-white py-2.5 px-3 mx-4 mb-4 rounded-md font-medium text-left transition-colors hover:bg-purple-hover shadow-sm">
+          <button
+            onClick={onNewChat}
+            className="flex items-center gap-2 bg-accent-purple text-white py-2.5 px-3 mx-4 mb-4 rounded-md font-medium text-left transition-colors hover:bg-purple-hover shadow-sm"
+          >
             <PlusIcon size={16} />
             New Chat
           </button>
 
+          <div className="px-4 mb-3">
+            <input
+              type="text"
+              placeholder="Search chats..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-input-bg text-white p-2 rounded text-sm border border-[#444] placeholder:text-gray-custom"
+            />
+          </div>
+
           <nav className="flex-grow overflow-y-auto px-2 pb-4 custom-scrollbar">
             <SidebarSection title="Chat History" defaultOpen={true}>
               <ul>
-                {displayedChats.map((chat) => (
-                  <li key={chat.id} className="relative group">
-                    {editingId === chat.id ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          handleRename(chat.id, editValue);
+                {recentChats.map((chat) => (
+                  <li key={chat.id} className="group flex items-center">
+                    {renamingId === chat.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => handleRename(chat.id, renameValue)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleRename(chat.id, renameValue);
+                          }
                         }}
-                        className="flex items-center"
-                      >
-                        <input
-                          className="bg-[#333333] text-sm w-full p-2 rounded text-white"
-                          value={editValue}
-                          autoFocus
-                          onChange={(e) => setEditValue(e.target.value)}
-                        />
-                        <button type="submit" className="ml-2">
-                          <CheckIcon size={16} className="text-accent-purple" />
-                        </button>
-                      </form>
+                        className="flex-1 p-2 mb-1 rounded text-sm bg-input-bg border border-[#444] text-white"
+                      />
                     ) : (
-                      <div className="flex justify-between items-center p-2 mb-1 hover:bg-[#333333] rounded transition-colors">
-                        <button
-                          className="text-left text-sm truncate w-full"
-                          onDoubleClick={() => handleStartEdit(chat.id, chat.name)}
-                        >
-                          {chat.name}
-                        </button>
-                        <div className="flex gap-2 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleArchive(chat.id)} title="Archive">
-                            <ArchiveIcon size={14} className="text-gray-400 hover:text-white" />
-                          </button>
-                          <button onClick={() => handleDelete(chat.id)} title="Delete">
-                            <Trash2Icon size={14} className="text-error hover:text-white" />
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        onDoubleClick={() => {
+                          setRenamingId(chat.id);
+                          setRenameValue(chat.title);
+                        }}
+                        onClick={() => onSelectChat(chat.id)}
+                        className={`flex-1 text-left p-2 mb-1 rounded text-sm truncate transition-colors ${
+                          activeChatId === chat.id
+                            ? 'bg-[#333333]'
+                            : 'hover:bg-[#333333]'
+                        }`}
+                      >
+                        {chat.title}
+                      </button>
                     )}
+                    <button
+                      onClick={() => onDeleteChat(chat.id)}
+                      className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition"
+                      title="Delete"
+                    >
+                      <Trash2Icon size={14} />
+                    </button>
                   </li>
                 ))}
-              </ul>
-            </SidebarSection>
 
-            <SidebarSection title="Archived" defaultOpen={false}>
-              <ul>
-                {archivedChats.map((chat) => (
-                  <li key={chat.id}>
-                    <div className="flex justify-between items-center p-2 mb-1 hover:bg-[#333333] rounded transition-colors">
-                      <span className="text-sm truncate">{chat.name}</span>
-                      <div className="flex gap-2 ml-2">
-                        <button onClick={() => handleArchive(chat.id)} title="Unarchive">
-                          <ArchiveIcon size={14} className="text-accent-purple" />
-                        </button>
-                        <button onClick={() => handleDelete(chat.id)} title="Delete">
-                          <Trash2Icon size={14} className="text-error" />
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                {!showAllChats && olderChats.length > 0 && (
+                  <button
+                    onClick={() => setShowAllChats(true)}
+                    className="w-full p-2 text-sm text-gray-custom hover:bg-[#333333] rounded transition-colors text-left opacity-75"
+                  >
+                    Show more chats...
+                  </button>
+                )}
+
+                {showAllChats &&
+                  olderChats.map((chat) => (
+                    <li key={chat.id} className="group flex items-center">
+                      <button
+                        onClick={() => onSelectChat(chat.id)}
+                        className={`flex-1 text-left p-2 mb-1 rounded text-sm truncate transition-colors opacity-60 ${
+                          activeChatId === chat.id
+                            ? 'bg-[#333333]'
+                            : 'hover:bg-[#333333]'
+                        }`}
+                      >
+                        {chat.title}
+                      </button>
+                      <button
+                        onClick={() => onDeleteChat(chat.id)}
+                        className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition"
+                        title="Delete"
+                      >
+                        <Trash2Icon size={14} />
+                      </button>
+                    </li>
+                  ))}
               </ul>
             </SidebarSection>
           </nav>
+
+          {isAdmin && (
+            <div className="px-4 mb-4">
+              <button
+                onClick={handleExport}
+                className="w-full flex items-center gap-2 justify-center text-sm py-2 rounded bg-card-bg hover:bg-[#2a2a2a] border border-[#444] text-gray-300"
+              >
+                <DownloadIcon size={14} />
+                Export Chats
+              </button>
+            </div>
+          )}
 
           <UserProfile onLogout={onLogout} />
         </>
