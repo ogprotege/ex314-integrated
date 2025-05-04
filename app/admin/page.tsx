@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// Define a proper type for the messages
 interface Message {
   id: string;
   chat_id: string;
@@ -14,24 +13,34 @@ interface Message {
 }
 
 export default function AdminPage() {
-  // Initialize with the correct type
   const [messages, setMessages] = useState<Message[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Check if user is admin
-    const userId = localStorage.getItem('user_id');
-    if (userId === 'admin') {
-      setIsAdmin(true);
-    }
+    // Set isClient to true once component is mounted
+    setIsClient(true);
+    
+    // Now safe to access browser APIs
+    if (typeof window !== 'undefined') {
+      const userId = localStorage.getItem('user_id');
+      if (userId === 'admin') {
+        setIsAdmin(true);
+      }
 
-    const load = async () => {
-      const { data, error } = await supabase.from('messages').select('*').order('timestamp');
-      if (data) setMessages(data as Message[]); // Type cast here for safety
-      if (error) console.error(error);
-    };
-    load();
+      const load = async () => {
+        const { data, error } = await supabase.from('messages').select('*').order('timestamp');
+        if (data) setMessages(data);
+        if (error) console.error(error);
+      };
+      load();
+    }
   }, []);
+
+  // Don't render anything during server-side rendering
+  if (!isClient) {
+    return null;
+  }
 
   if (!isAdmin) {
     return (
