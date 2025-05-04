@@ -47,6 +47,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   // Set isClient to true once component is mounted
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  // Handle user ID only after client-side rendering
+  useEffect(() => {
+    if (!isClient) return;
     
     // Now it's safe to access localStorage
     const storedUserId = localStorage.getItem('user_id');
@@ -57,11 +62,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.setItem('user_id', newUserId);
       setUserId(newUserId);
     }
-  }, []);
+  }, [isClient]);
 
-  // Only load chats after component has mounted
+  // Only load chats after component has mounted and userId is set
   useEffect(() => {
-    if (isClient) {
+    if (isClient && userId) {
       const stored = localStorage.getItem('chat_threads');
       if (stored) {
         const parsedChats = JSON.parse(stored);
@@ -69,11 +74,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setVisibleChats(parsedChats);
       }
     }
-  }, [isClient]);
+  }, [isClient, userId]);
 
   // Load messages when activeChatId changes
   useEffect(() => {
-    if (isClient && activeChatId) {
+    if (isClient && userId && activeChatId) {
       const local = localStorage.getItem(getStorageKey(activeChatId));
       if (local) {
         setMessages(JSON.parse(local));
@@ -88,13 +93,15 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           });
       }
     }
-  }, [activeChatId, isClient]);
+  }, [activeChatId, isClient, userId]);
 
   function getStorageKey(chatId: string) {
+    if (!userId) return '';
     return `chat_history_${chatId}_${userId}`;
   }
 
   const persistChats = (updated: Chat[]) => {
+    if (!isClient) return;
     setChats(updated);
     setVisibleChats(updated);
     localStorage.setItem('chat_threads', JSON.stringify(updated));
@@ -168,7 +175,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const sendMessage = async (content: string) => {
-    if (!isClient || !activeChatId) return;
+    if (!isClient || !activeChatId || !userId) return;
 
     const userMessage: Message = {
       id: uuidv4(),
