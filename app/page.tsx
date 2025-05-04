@@ -40,26 +40,36 @@ export default function Home() {
       role: 'user',
       timestamp: new Date()
     };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
+
+    const assistantId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date()
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
     setIsLoading(true);
 
     try {
-      const response = await chatService.sendMessage(content);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (err) {
-      const fallback: Message = {
-        id: (Date.now() + 2).toString(),
-        content: "Sorry, I'm having trouble reaching the AI service.",
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, fallback]);
+      await chatService.streamMessage(content, (chunk) => {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          )
+        );
+      });
+    } catch (error) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantId
+            ? { ...msg, content: '⚠️ Error streaming AI response.' }
+            : msg
+        )
+      );
     } finally {
       setIsLoading(false);
     }
