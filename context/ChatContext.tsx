@@ -16,7 +16,7 @@ export type Message = {
 export type Chat = {
   id: string;
   title: string;
-  status: 'active' | 'starred' | 'archived';
+  status: 'active' | 'starred' | 'archived' | 'deleted';
   preview?: string;
 };
 
@@ -33,7 +33,7 @@ type ChatContextType = {
   deleteChat: (id: string) => void;
   exportChats: () => void;
   searchMessages: (query: string) => void;
-  filterChats: (status: 'all' | 'starred' | 'archived') => void;
+  filterChats: (status: 'all' | 'starred' | 'archived' | 'deleted') => void;
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -112,20 +112,16 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const deleteChat = (id: string) => {
-    const updated = chats.filter((c) => c.id !== id);
+    // Instead of removing the chat, update its status to 'deleted'
+    const updated = chats.map((c) => 
+      c.id === id ? { ...c, status: 'deleted' } : c
+    );
     persistChats(updated);
+    
     if (id === activeChatId) {
       setActiveChatId(null);
       setMessages([]);
     }
-    
-    // Add check before localStorage access
-    if (isBrowser) {
-      localStorage.removeItem(getStorageKey(id));
-    }
-    
-    // If using Supabase
-    supabase.from('messages').delete().eq('chat_id', id);
   };
 
   const newChat = () => {
@@ -146,11 +142,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     setActiveChatId(id);
   };
 
-  const filterChats = (filter: 'all' | 'starred' | 'archived') => {
-    if (filter === 'all') {
+  const filterChats = (status: 'all' | 'starred' | 'archived' | 'deleted') => {
+    if (status === 'all') {
       setVisibleChats(chats);
     } else {
-      setVisibleChats(chats.filter(chat => chat.status === filter));
+      setVisibleChats(chats.filter(chat => chat.status === status));
     }
   };
 
