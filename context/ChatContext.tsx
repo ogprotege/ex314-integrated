@@ -18,6 +18,7 @@ export type Chat = {
 
 type ChatContextType = {
   chats: Chat[];
+  visibleChats: Chat[];
   messages: Message[];
   activeChatId: string | null;
   isLoading: boolean;
@@ -27,9 +28,8 @@ type ChatContextType = {
   updateChat: (id: string, update: Partial<Chat>) => void;
   deleteChat: (id: string) => void;
   exportChats: () => void;
-  searchMessages?: (query: string) => void;
-  visibleChats?: Chat[];
-  filterChats?: (status: 'all' | 'starred' | 'archived') => void;
+  searchMessages: (query: string) => void;
+  filterChats: (status: 'all' | 'starred' | 'archived') => void;
 };
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
