@@ -6,20 +6,31 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Trash2Icon,
-  DownloadIcon
+  DownloadIcon,
+  StarIcon,
+  ArchiveIcon,
+  InboxIcon
 } from 'lucide-react';
-
 import { SidebarSection } from './SidebarSection';
 import { UserProfile } from './UserProfile';
+
+type ChatStatus = 'active' | 'starred' | 'archived';
+
+interface Chat {
+  id: string;
+  title: string;
+  status: ChatStatus;
+}
 
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onLogout?: () => void;
-  chats: { id: string; title: string }[];
+  chats: Chat[];
   onNewChat: () => void;
   onDeleteChat: (id: string) => void;
   onSelectChat: (id: string) => void;
+  onUpdateChat: (id: string, update: Partial<Chat>) => void;
   activeChatId: string | null;
 }
 
@@ -31,28 +42,23 @@ export const Sidebar = ({
   onNewChat,
   onDeleteChat,
   onSelectChat,
+  onUpdateChat,
   activeChatId
 }: SidebarProps) => {
-  const [showAllChats, setShowAllChats] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [tab, setTab] = useState<'all' | 'starred' | 'archived'>('all');
 
-  const isAdmin =
-    typeof window !== 'undefined' &&
-    localStorage.getItem('user_is_admin') === 'true';
+  const isAdmin = typeof window !== 'undefined' && localStorage.getItem('user_is_admin') === 'true';
 
   const handleRename = (id: string, title: string) => {
-    const updated = chats.map((chat) =>
-      chat.id === id ? { ...chat, title } : chat
-    );
-    localStorage.setItem('chat_threads', JSON.stringify(updated));
+    onUpdateChat(id, { title });
     setRenamingId(null);
   };
 
   const handleExport = () => {
-    const threads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
-    const blob = new Blob([JSON.stringify(threads, null, 2)], {
+    const blob = new Blob([JSON.stringify(chats, null, 2)], {
       type: 'application/json'
     });
     const url = URL.createObjectURL(blob);
@@ -63,12 +69,14 @@ export const Sidebar = ({
     URL.revokeObjectURL(url);
   };
 
-  const filteredChats = chats.filter((chat) =>
-    chat.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const recentChats = filteredChats.slice(0, 7);
-  const olderChats = filteredChats.slice(7);
+  const filtered = chats
+    .filter((c) => {
+      if (tab === 'starred') return c.status === 'starred';
+      if (tab === 'archived') return c.status === 'archived';
+      return c.status !== 'archived';
+    })
+    .filter((c) => c.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => (a.status === 'starred' ? -1 : 0));
 
   return (
     <aside
@@ -80,11 +88,7 @@ export const Sidebar = ({
         {!isCollapsed ? (
           <>
             <div className="w-7 h-7 bg-accent-purple rounded flex items-center justify-center shadow-sm">
-              <img
-                src="/jerusalem-cross.png"
-                alt="Jerusalem Cross"
-                className="w-5 h-5"
-              />
+              <img src="/jerusalem-cross.png" alt="Jerusalem Cross" className="w-5 h-5" />
             </div>
             <span className="text-base font-semibold">AI Assistant</span>
           </>
@@ -96,13 +100,8 @@ export const Sidebar = ({
         <button
           onClick={onToggle}
           className="ml-auto p-1.5 hover:bg-card-bg rounded-lg transition-colors"
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed ? (
-            <ChevronRightIcon size={18} />
-          ) : (
-            <ChevronLeftIcon size={18} />
-          )}
+          {isCollapsed ? <ChevronRightIcon size={18} /> : <ChevronLeftIcon size={18} />}
         </button>
       </div>
 
@@ -115,6 +114,33 @@ export const Sidebar = ({
             <PlusIcon size={16} />
             New Chat
           </button>
+
+          <div className="px-4 mb-3 flex gap-2">
+            <button
+              onClick={() => setTab('all')}
+              className={`flex-1 text-sm py-1 rounded ${
+                tab === 'all' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setTab('starred')}
+              className={`flex-1 text-sm py-1 rounded ${
+                tab === 'starred' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
+              }`}
+            >
+              ⭐ Starred
+            </button>
+            <button
+              onClick={() => setTab('archived')}
+              className={`flex-1 text-sm py-1 rounded ${
+                tab === 'archived' ? 'bg-accent-purple text-white' : 'bg-card-bg text-gray-300'
+              }`}
+            >
+              📦 Archived
+            </button>
+          </div>
 
           <div className="px-4 mb-3">
             <input
@@ -129,7 +155,7 @@ export const Sidebar = ({
           <nav className="flex-grow overflow-y-auto px-2 pb-4 custom-scrollbar">
             <SidebarSection title="Chat History" defaultOpen={true}>
               <ul>
-                {recentChats.map((chat) => (
+                {filtered.map((chat) => (
                   <li key={chat.id} className="group flex items-center">
                     {renamingId === chat.id ? (
                       <input
@@ -138,9 +164,7 @@ export const Sidebar = ({
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={() => handleRename(chat.id, renameValue)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleRename(chat.id, renameValue);
-                          }
+                          if (e.key === 'Enter') handleRename(chat.id, renameValue);
                         }}
                         className="flex-1 p-2 mb-1 rounded text-sm bg-input-bg border border-[#444] text-white"
                       />
@@ -160,47 +184,44 @@ export const Sidebar = ({
                         {chat.title}
                       </button>
                     )}
+
+                    <button
+                      onClick={() =>
+                        onUpdateChat(chat.id, {
+                          status: chat.status === 'starred' ? 'active' : 'starred'
+                        })
+                      }
+                      title="Star"
+                      className="text-gray-400 hover:text-yellow-400 ml-1"
+                    >
+                      <StarIcon size={14} fill={chat.status === 'starred' ? 'currentColor' : 'none'} />
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        onUpdateChat(chat.id, {
+                          status: chat.status === 'archived' ? 'active' : 'archived'
+                        })
+                      }
+                      title="Archive"
+                      className="text-gray-400 hover:text-blue-400 ml-1"
+                    >
+                      {chat.status === 'archived' ? (
+                        <InboxIcon size={14} />
+                      ) : (
+                        <ArchiveIcon size={14} />
+                      )}
+                    </button>
+
                     <button
                       onClick={() => onDeleteChat(chat.id)}
-                      className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition"
+                      className="ml-1 text-gray-400 hover:text-red-400 transition"
                       title="Delete"
                     >
                       <Trash2Icon size={14} />
                     </button>
                   </li>
                 ))}
-
-                {!showAllChats && olderChats.length > 0 && (
-                  <button
-                    onClick={() => setShowAllChats(true)}
-                    className="w-full p-2 text-sm text-gray-custom hover:bg-[#333333] rounded transition-colors text-left opacity-75"
-                  >
-                    Show more chats...
-                  </button>
-                )}
-
-                {showAllChats &&
-                  olderChats.map((chat) => (
-                    <li key={chat.id} className="group flex items-center">
-                      <button
-                        onClick={() => onSelectChat(chat.id)}
-                        className={`flex-1 text-left p-2 mb-1 rounded text-sm truncate transition-colors opacity-60 ${
-                          activeChatId === chat.id
-                            ? 'bg-[#333333]'
-                            : 'hover:bg-[#333333]'
-                        }`}
-                      >
-                        {chat.title}
-                      </button>
-                      <button
-                        onClick={() => onDeleteChat(chat.id)}
-                        className="ml-1 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition"
-                        title="Delete"
-                      >
-                        <Trash2Icon size={14} />
-                      </button>
-                    </li>
-                  ))}
               </ul>
             </SidebarSection>
           </nav>
