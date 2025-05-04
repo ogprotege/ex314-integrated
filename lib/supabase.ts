@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseUrl = 'https://muuudtypgfelwfklghwv.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Create a service client for server-side operations that require more privileges
 export const getServiceSupabase = () => {
