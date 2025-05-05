@@ -304,4 +304,51 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const exportChats = () => {
     // Add check before localStorage access
-    if (!isBrowser) ret
+    if (!isBrowser) return;
+    
+    if (userId !== 'admin') return alert('Only admin can export');
+
+    const exportData: Record<string, Message[]> = {};
+    chats.forEach((chat) => {
+      const data = localStorage.getItem(getStorageKey(chat.id));
+      if (data) exportData[chat.title] = JSON.parse(data);
+    });
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `ex314_export.json`;
+    link.click();
+  };
+
+  return (
+    <ChatContext.Provider
+      value={{
+        chats,
+        visibleChats,
+        messages,
+        activeChatId,
+        isLoading,
+        sendMessage,
+        newChat,
+        selectChat,
+        updateChat,
+        deleteChat,
+        exportChats,
+        searchMessages,
+        filterChats
+      }}
+    >
+      {children}
+    </ChatContext.Provider>
+  );
+};
+
+export const useChat = () => {
+  const ctx = useContext(ChatContext);
+  if (!ctx) throw new Error('useChat must be used within ChatProvider');
+  return ctx;
+};
