@@ -1,7 +1,9 @@
+// context/ChatContext.tsx
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import supabase from '@/lib/supabase';
+import { ChatService } from '@/lib/services/chatService';
 
 // Browser check for server-side rendering
 const isBrowser = typeof window !== 'undefined';
@@ -46,6 +48,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const userId = getUserId();
+  const chatService = new ChatService();
 
   function getUserId() {
     // Add check before localStorage access
@@ -207,7 +210,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     
     setIsLoading(true);
 
-    // If using Supabase
+    // If using Supabase, store the user message
     await supabase.from('messages').insert({
       chat_id: activeChatId,
       user_id: userId,
@@ -217,25 +220,53 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     try {
-      const context = updatedMessages; // Full message context
-      const res = await fetch('/api/langchain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, context })
-      });
-
-      const data = await res.json();
-
-      const aiMessage: Message = {
+      // Create an empty assistant message to show typing indicator
+      const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        content: data.response,
+        content: '', // Start with empty content
         role: 'assistant',
         timestamp: new Date()
       };
 
-      const allMessages = [...updatedMessages, aiMessage];
-      setMessages(allMessages);
+      // Add the empty assistant message to show typing indicator
+      setMessages([...updatedMessages, assistantMessage]);
       
+      let fullResponse = '';
+      
+      // Stream the response using Together AI
+      await chatService.streamMessage(
+        content, 
+        updatedMessages,
+        (chunk, fullContent) => {
+          fullResponse = fullContent;
+          
+          // Update the message content as chunks arrive
+          setMessages(current => {
+            const lastMessage = current[current.length - 1];
+            if (lastMessage.role === 'assistant') {
+              return [
+                ...current.slice(0, -1),
+                { ...lastMessage, content: fullContent }
+              ];
+            }
+            return current;
+          });
+        }
+      );
+
+      // Final response is now complete
+      const completedAssistantMessage: Message = {
+        ...assistantMessage,
+        content: fullResponse,
+      };
+
+      const allMessages = [...updatedMessages, completedAssistantMessage];
+      
+      // Update local storage with the complete conversation
+      if (isBrowser) {
+        localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
+      }
+
       // Generate a preview from the user's message
       const preview = content.length > 64 ? content.slice(0, 64) + '...' : content;
       
@@ -244,22 +275,29 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         chat.id === activeChatId ? { ...chat, preview } : chat
       );
       persistChats(updatedChat);
-      
-      // Add check before localStorage access
-      if (isBrowser) {
-        localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
-      }
 
-      // If using Supabase
+      // Store the assistant message in Supabase
       await supabase.from('messages').insert({
         chat_id: activeChatId,
         user_id: userId,
-        content: aiMessage.content,
-        role: aiMessage.role,
-        timestamp: aiMessage.timestamp.toISOString()
+        content: completedAssistantMessage.content,
+        role: completedAssistantMessage.role,
+        timestamp: completedAssistantMessage.timestamp.toISOString()
       });
     } catch (err) {
       console.error('AI ERROR:', err);
+      
+      // Handle error by updating UI
+      setMessages(current => {
+        const lastMessage = current[current.length - 1];
+        if (lastMessage.role === 'assistant' && lastMessage.content === '') {
+          return [
+            ...current.slice(0, -1),
+            { ...lastMessage, content: "I'm sorry, I encountered an error while processing your request." }
+          ];
+        }
+        return current;
+      });
     } finally {
       setIsLoading(false);
     }
