@@ -1,9 +1,9 @@
-import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream";
+import togetherAIService from './togetherAIService';
 import type { Message } from "../types";
 
 export class ChatService {
   /**
-   * Send a chat message to the LLM endpoint and return the response
+   * Send a chat message to the Together AI endpoint and return the response
    */
   async sendMessage(message: string, context: Message[] = []): Promise<string> {
     try {
@@ -19,33 +19,8 @@ export class ChatService {
         content: message
       });
 
-      const response = await fetch('/api/together', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages: togetherMessages })
-      });
-
-      if (!response.ok) {
-        throw new Error(`LLM API error: ${response.status}`);
-      }
-
-      if (!response.body) throw new Error('No response body');
-      
-      let fullResponse = '';
-      
-      // Process the streamed response
-      await ChatCompletionStream.fromReadableStream(response.body)
-        .on('content', (_, content) => {
-          fullResponse = content;
-        })
-        .on('error', (error) => {
-          console.error('Streaming error:', error);
-          throw error;
-        });
-      
-      return fullResponse;
+      // Use the Together AI service
+      return await togetherAIService.chatCompletion(togetherMessages);
     } catch (error) {
       console.error('ChatService.sendMessage error:', error);
       throw error;
@@ -53,7 +28,7 @@ export class ChatService {
   }
 
   /**
-   * Send a streaming request to the LLM endpoint and process response chunks
+   * Send a streaming request to the Together AI endpoint and process response chunks
    */
   async streamMessage(
     message: string, 
@@ -73,30 +48,11 @@ export class ChatService {
         content: message
       });
 
-      const response = await fetch('/api/together', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages: togetherMessages })
-      });
-
-      if (!response.ok) {
-        throw new Error(`LLM streaming error: ${response.status}`);
-      }
-
-      if (!response.body) throw new Error('No response body');
-      
-      // Process the streamed response
-      ChatCompletionStream.fromReadableStream(response.body)
-        .on('content', (delta, content) => {
-          onChunk(delta, content);
-        })
-        .on('error', (error) => {
-          console.error('Streaming error:', error);
-          throw error;
-        });
-
+      // Use the Together AI service for streaming
+      await togetherAIService.streamChatCompletion(
+        togetherMessages,
+        onChunk
+      );
     } catch (error) {
       console.error('ChatService.streamMessage error:', error);
       throw error;
