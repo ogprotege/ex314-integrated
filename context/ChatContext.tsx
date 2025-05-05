@@ -4,14 +4,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ChatService } from '@/lib/services/chatService';
 
-// Browser check
 const isBrowser = typeof window !== 'undefined';
 
 export type Message = {
   id: string;
   content: string;
   role: 'user' | 'assistant';
-  timestamp: number; // ✅ FIXED
+  timestamp: Date;
 };
 
 export type Chat = {
@@ -46,10 +45,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const userId = getUserId();
   const chatService = new ChatService();
+  const userId = getUserId();
 
-  function getUserId() {
+  function getUserId(): string {
     if (!isBrowser) return '';
     let id = localStorage.getItem('user_id');
     if (!id) {
@@ -134,29 +133,26 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const filterChats = (status: 'all' | 'starred' | 'archived' | 'deleted') => {
-    if (status === 'all') {
-      setVisibleChats(chats);
-    } else {
-      setVisibleChats(chats.filter((chat) => chat.status === status));
-    }
+    setVisibleChats(
+      status === 'all' ? chats : chats.filter((chat) => chat.status === status)
+    );
   };
 
   const searchMessages = (query: string) => {
-    if (!isBrowser || !query.trim()) {
+    if (!isBrowser) return;
+    if (!query.trim()) {
       setVisibleChats(chats);
       return;
     }
-
     const q = query.toLowerCase();
     const filtered = chats.filter((chat) => {
       if (chat.title.toLowerCase().includes(q)) return true;
-      if (chat.preview && chat.preview.toLowerCase().includes(q)) return true;
+      if (chat.preview?.toLowerCase().includes(q)) return true;
       const chatMessages = JSON.parse(localStorage.getItem(getStorageKey(chat.id)) || '[]');
       return chatMessages.some((msg: Message) =>
         msg.content.toLowerCase().includes(q) || msg.role.toLowerCase().includes(q)
       );
     });
-
     setVisibleChats(filtered);
   };
 
@@ -167,57 +163,35 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       id: crypto.randomUUID(),
       content,
       role: 'user',
-      timestamp: Date.now() // ✅ FIXED
+      timestamp: new Date()
     };
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
+
     if (isBrowser) {
       localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(updatedMessages));
     }
 
     setIsLoading(true);
 
-    await supabase.from('messages').insert({
-      chat_id: activeChatId,
-      user_id: userId,
-      content: userMessage.content,
-      role: userMessage.role,
-      timestamp: userMessage.timestamp
-    });
-
     try {
+      const assistantReply = await chatService.sendMessage(
+        content,
+        updatedMessages,
+        userId,
+        activeChatId
+      );
+
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        content: '',
+        content: assistantReply,
         role: 'assistant',
-        timestamp: Date.now() // ✅ FIXED
+        timestamp: new Date()
       };
 
-      setMessages([...updatedMessages, assistantMessage]);
-
-      let fullResponse = '';
-
-      await chatService.streamMessage(content, updatedMessages, (chunk, fullContent) => {
-        fullResponse = fullContent;
-        setMessages((current) => {
-          const lastMessage = current[current.length - 1];
-          if (lastMessage.role === 'assistant') {
-            return [
-              ...current.slice(0, -1),
-              { ...lastMessage, content: fullContent }
-            ];
-          }
-          return current;
-        });
-      });
-
-      const completedAssistantMessage: Message = {
-        ...assistantMessage,
-        content: fullResponse
-      };
-
-      const allMessages = [...updatedMessages, completedAssistantMessage];
+      const allMessages = [...updatedMessages, assistantMessage];
+      setMessages(allMessages);
 
       if (isBrowser) {
         localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
@@ -228,23 +202,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         chat.id === activeChatId ? { ...chat, preview } : chat
       );
       persistChats(updatedChat);
-
-      await supabase.from('messages').insert({
-        chat_id: activeChatId,
-        user_id: userId,
-        content: completedAssistantMessage.content,
-        role: completedAssistantMessage.role,
-        timestamp: completedAssistantMessage.timestamp
-      });
     } catch (err) {
       console.error('AI ERROR:', err);
       setMessages((current) => {
-        const lastMessage = current[current.length - 1];
-        if (lastMessage.role === 'assistant' && lastMessage.content === '') {
-          return [
-            ...current.slice(0, -1),
-            { ...lastMessage, content: "I'm sorry, I encountered an error while processing your request." }
-          ];
+        const last = current.at(-1);
+        if (last?.role === 'assistant' && last.content === '') {
+          return [...current.slice(0, -1), { ...last, content: '⚠️ AI error occurred.' }];
         }
         return current;
       });
@@ -254,18 +217,15 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const exportChats = () => {
-    if (!isBrowser || userId !== 'admin') return alert('Only admin can export');
-
+    if (!isBrowser || userId !== 'admin') return;
     const exportData: Record<string, Message[]> = {};
     chats.forEach((chat) => {
       const data = localStorage.getItem(getStorageKey(chat.id));
       if (data) exportData[chat.title] = JSON.parse(data);
     });
-
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
       type: 'application/json'
     });
-
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `ex314_export.json`;
