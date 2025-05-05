@@ -13,8 +13,11 @@ export class ChatService {
     });
 
     const messages = [
-      ...validatedContext.map(({ role, content }) => ({ role, content })),
-      { role: 'user', content: message }
+      ...validatedContext.map(({ role, content }) => ({
+        role: role as 'user' | 'assistant' | 'system', // ✅ type-safe
+        content
+      })),
+      { role: 'user' as const, content: message }
     ];
 
     return await togetherAIService.chatCompletion(messages);
@@ -34,8 +37,11 @@ export class ChatService {
     });
 
     const messages = [
-      ...validatedContext.map(({ role, content }) => ({ role, content })),
-      { role: 'user', content: message }
+      ...validatedContext.map(({ role, content }) => ({
+        role: role as 'user' | 'assistant' | 'system', // ✅ type-safe
+        content
+      })),
+      { role: 'user' as const, content: message }
     ];
 
     await togetherAIService.streamChatCompletion(messages, onChunk);
