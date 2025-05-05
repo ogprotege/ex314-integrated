@@ -10,7 +10,7 @@ export type Message = {
   id: string;
   content: string;
   role: 'user' | 'assistant';
-  timestamp: Date;
+  timestamp: number; // Fixed: was Date
 };
 
 export type Chat = {
@@ -163,7 +163,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       id: crypto.randomUUID(),
       content,
       role: 'user',
-      timestamp: new Date()
+      timestamp: Date.now() // Fixed
     };
 
     const updatedMessages = [...messages, userMessage];
@@ -187,7 +187,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         id: crypto.randomUUID(),
         content: assistantReply,
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: Date.now() // Fixed
       };
 
       const allMessages = [...updatedMessages, assistantMessage];
