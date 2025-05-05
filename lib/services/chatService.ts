@@ -1,26 +1,52 @@
+// lib/services/chatService.ts
+import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream";
+import type { Message } from "../types";
+
 export class ChatService {
   /**
    * Send a chat message to the LLM endpoint and return the response
    */
-  async sendMessage(message: string): Promise<string> {
+  async sendMessage(message: string, context: Message[] = []): Promise<string> {
     try {
-      const response = await fetch(process.env.NEXT_PUBLIC_LLM_API_URL!, {
+      // Convert your existing messages format to Together's format
+      const togetherMessages = context.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // Add the current message
+      togetherMessages.push({
+        role: 'user',
+        content: message
+      });
+
+      const response = await fetch('/api/together', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(process.env.NEXT_PUBLIC_LLM_API_KEY && {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`
-          })
         },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ messages: togetherMessages })
       });
 
       if (!response.ok) {
         throw new Error(`LLM API error: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.response; // Adjust if your API returns differently
+      if (!response.body) throw new Error('No response body');
+      
+      let fullResponse = '';
+      
+      // Process the streamed response
+      await ChatCompletionStream.fromReadableStream(response.body)
+        .on('content', (_, content) => {
+          fullResponse = content;
+        })
+        .on('error', (error) => {
+          console.error('Streaming error:', error);
+          throw error;
+        });
+      
+      return fullResponse;
     } catch (error) {
       console.error('ChatService.sendMessage error:', error);
       throw error;
@@ -30,33 +56,48 @@ export class ChatService {
   /**
    * Send a streaming request to the LLM endpoint and process response chunks
    */
-  async streamMessage(message: string, onChunk: (chunk: string) => void): Promise<void> {
+  async streamMessage(
+    message: string, 
+    context: Message[] = [], 
+    onChunk: (chunk: string, fullContent: string) => void
+  ): Promise<void> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LLM_API_URL!}/stream`, {
+      // Convert your existing messages format to Together's format
+      const togetherMessages = context.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // Add the current message
+      togetherMessages.push({
+        role: 'user',
+        content: message
+      });
+
+      const response = await fetch('/api/together', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(process.env.NEXT_PUBLIC_LLM_API_KEY && {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`
-          })
         },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ messages: togetherMessages })
       });
 
       if (!response.ok) {
         throw new Error(`LLM streaming error: ${response.status}`);
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No readable stream in response');
+      if (!response.body) throw new Error('No response body');
+      
+      // Process the streamed response
+      ChatCompletionStream.fromReadableStream(response.body)
+        .on('content', (delta, content) => {
+          onChunk(delta, content);
+        })
+        .on('error', (error) => {
+          console.error('Streaming error:', error);
+          throw error;
+        });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        onChunk(chunk);
-      }
     } catch (error) {
       console.error('ChatService.streamMessage error:', error);
       throw error;
