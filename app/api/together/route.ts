@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   // Use your fine-tuned model here
   const res = await together.chat.completions.create({
     // Replace with your fine-tuned model name
-    model: "YOUR_FINE_TUNED_MODEL_NAME",
+    model: "thebiscuit1/Llama-3.3-70B-32k-Instruct-Reference-ex314-ft-p1-round3-0daf7fe8",
     messages,
     stream: true,
   });
