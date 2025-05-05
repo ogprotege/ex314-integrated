@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import supabase from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { ChatService } from '@/lib/services/chatService';
 
 // Browser check for server-side rendering
