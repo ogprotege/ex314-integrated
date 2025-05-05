@@ -1,49 +1,36 @@
-import togetherAIService from './togetherAIService';
+import { getTogetherAIResponse } from '@/lib/services/chatAPIClient';
 import { MessageSchema } from '@/lib/validation/messageSchema';
 import type { Message } from '@/lib/validation/messageSchema';
 
 export class ChatService {
   /**
-   * Validate and send a chat message to Together AI
+   * Validate and send a chat message to Together AI via API route
    */
   async sendMessage(message: string, context: Message[] = []): Promise<string> {
-    const validatedContext = context.filter((msg) => {
-      const result = MessageSchema.safeParse(msg);
-      return result.success;
-    });
+    const validatedContext = context.filter((msg) =>
+      MessageSchema.safeParse(msg).success
+    );
 
     const messages = [
       ...validatedContext.map(({ role, content }) => ({
-        role: role as 'user' | 'assistant' | 'system', // ✅ type-safe
+        role: role as 'user' | 'assistant' | 'system',
         content
       })),
       { role: 'user' as const, content: message }
     ];
 
-    return await togetherAIService.chatCompletion(messages);
+    return await getTogetherAIResponse(messages);
   }
 
   /**
-   * Validate and stream a message to Together AI
+   * Streaming version (to be implemented later)
    */
   async streamMessage(
     message: string,
     context: Message[] = [],
     onChunk: (chunk: string, fullContent: string) => void
   ): Promise<void> {
-    const validatedContext = context.filter((msg) => {
-      const result = MessageSchema.safeParse(msg);
-      return result.success;
-    });
-
-    const messages = [
-      ...validatedContext.map(({ role, content }) => ({
-        role: role as 'user' | 'assistant' | 'system', // ✅ type-safe
-        content
-      })),
-      { role: 'user' as const, content: message }
-    ];
-
-    await togetherAIService.streamChatCompletion(messages, onChunk);
+    console.warn('⚠️ streamMessage() not implemented yet with API proxy.');
+    throw new Error('streamMessage() not supported yet.');
   }
 }
