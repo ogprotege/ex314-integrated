@@ -1,20 +1,67 @@
-import Together from "together-ai";
+import { OpenAI } from 'openai';
+import { NextResponse } from 'next/server';
+import { getServiceSupabase } from '@/lib/supabaseClient';
 
-// Initialize the Together client with proper options object
-const together = new Together({
-  apiKey: process.env.NEXT_PUBLIC_TOGETHER_AI_API_KEY
+const together = new OpenAI({
+  apiKey: process.env.TOGETHER_API_KEY!,
+  baseURL: 'https://api.together.xyz/v1',
 });
 
-export async function POST(request: Request) {
-  const { messages } = await request.json();
+export async function POST(req: Request) {
+  try {
+    const { messages, stream = false, user_id, chat_id } = await req.json();
 
-  // Use your fine-tuned model here
-  const res = await together.chat.completions.create({
-    // Replace with your fine-tuned model name
-    model: "thebiscuit1/Llama-3.3-70B-32k-Instruct-Reference-ex314-ft-p1-round3-0daf7fe8", // Your fine-tuned model name
-    messages,
-    stream: true,
-  });
+    if (!Array.isArray(messages)) {
+      return NextResponse.json({ error: 'Invalid messages array' }, { status: 400 });
+    }
 
-  return new Response(res.toReadableStream());
+    const model = 'thebiscuit1/Llama-3.3-70B-32k-Instruct-Reference-ex314-ft-p1-round3-0daf7fe8';
+
+    const response = await together.chat.completions.create({
+      model,
+      messages,
+      max_tokens: 16384,
+      stream,
+    });
+
+    const assistantReply = response.choices[0]?.message?.content ?? '';
+
+    // ✅ Supabase logging
+    const supabase = getServiceSupabase();
+
+    if (user_id && chat_id) {
+      const now = new Date().toISOString();
+
+      // Insert user message(s)
+      const userMessages = messages
+        .filter((msg: any) => msg.role === 'user')
+        .map((msg: any) => ({
+          user_id,
+          chat_id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: now,
+          model_used: model,
+        }));
+
+      // Insert assistant reply
+      const assistantMessage = {
+        user_id,
+        chat_id,
+        role: 'assistant',
+        content: assistantReply,
+        timestamp: new Date().toISOString(),
+        model_used: model,
+      };
+
+      await supabase.from('messages').insert([...userMessages, assistantMessage]);
+    }
+
+    return NextResponse.json({
+      result: assistantReply,
+    });
+  } catch (err: any) {
+    console.error('[Together API Error]', err);
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+  }
 }
