@@ -1,4 +1,3 @@
-// lib/services/chatService.ts
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream";
 import type { Message } from "../types";
 
