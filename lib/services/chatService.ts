@@ -4,9 +4,15 @@ import type { Message } from '@/lib/validation/messageSchema';
 
 export class ChatService {
   /**
-   * Validate and send a chat message to Together AI via API route
+   * Validate and send a chat message to Together AI via API route.
+   * Logs both user and assistant messages to Supabase.
    */
-  async sendMessage(message: string, context: Message[] = []): Promise<string> {
+  async sendMessage(
+    message: string,
+    context: Message[] = [],
+    userId?: string,
+    chatId?: string
+  ): Promise<string> {
     const validatedContext = context.filter((msg) =>
       MessageSchema.safeParse(msg).success
     );
@@ -19,11 +25,11 @@ export class ChatService {
       { role: 'user' as const, content: message }
     ];
 
-    return await getTogetherAIResponse(messages);
+    return await getTogetherAIResponse(messages, userId, chatId);
   }
 
   /**
-   * Streaming version (to be implemented later)
+   * Streaming version — still to be implemented via proxy.
    */
   async streamMessage(
     message: string,
