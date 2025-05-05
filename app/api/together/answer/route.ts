@@ -1,4 +1,3 @@
-// app/api/together/answer/route.ts
 import Together from "together-ai";
 
 // Initialize the Together client with proper options object
