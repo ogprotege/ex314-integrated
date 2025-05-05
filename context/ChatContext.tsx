@@ -4,14 +4,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ChatService } from '@/lib/services/chatService';
 
-// Browser check for server-side rendering
+// Browser check
 const isBrowser = typeof window !== 'undefined';
 
 export type Message = {
   id: string;
   content: string;
   role: 'user' | 'assistant';
-  timestamp: Date;
+  timestamp: number; // ✅ FIXED
 };
 
 export type Chat = {
@@ -50,9 +50,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const chatService = new ChatService();
 
   function getUserId() {
-    // Add check before localStorage access
     if (!isBrowser) return '';
-    
     let id = localStorage.getItem('user_id');
     if (!id) {
       id = crypto.randomUUID();
@@ -66,9 +64,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   useEffect(() => {
-    // Add check before localStorage access
     if (!isBrowser) return;
-    
     const stored = localStorage.getItem('chat_threads');
     if (stored) {
       const parsedChats = JSON.parse(stored);
@@ -78,10 +74,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (activeChatId) {
-      // Add check before localStorage access
-      if (!isBrowser) return;
-      
+    if (activeChatId && isBrowser) {
       const local = localStorage.getItem(getStorageKey(activeChatId));
       if (local) {
         setMessages(JSON.parse(local));
@@ -101,8 +94,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const persistChats = (updated: Chat[]) => {
     setChats(updated);
     setVisibleChats(updated);
-    
-    // Add check before localStorage access
     if (isBrowser) {
       localStorage.setItem('chat_threads', JSON.stringify(updated));
     }
@@ -114,19 +105,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const deleteChat = (id: string) => {
-    // Instead of removing the chat, update its status to 'deleted'
-    const updated = chats.map((chat) => {
-      if (chat.id === id) {
-        return {
-          ...chat,
-          status: 'deleted' as const // Use const assertion to fix TypeScript error
-        };
-      }
-      return chat;
-    });
-    
+    const updated = chats.map((chat) =>
+      chat.id === id ? { ...chat, status: 'deleted' as const } : chat
+    );
     persistChats(updated);
-    
     if (id === activeChatId) {
       setActiveChatId(null);
       setMessages([]);
@@ -155,37 +137,26 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     if (status === 'all') {
       setVisibleChats(chats);
     } else {
-      setVisibleChats(chats.filter(chat => chat.status === status));
+      setVisibleChats(chats.filter((chat) => chat.status === status));
     }
   };
 
   const searchMessages = (query: string) => {
-    if (!isBrowser) return;
-    
-    if (!query.trim()) {
+    if (!isBrowser || !query.trim()) {
       setVisibleChats(chats);
       return;
     }
-    
+
     const q = query.toLowerCase();
-    const filtered = chats.filter(chat => {
-      // Search in title
+    const filtered = chats.filter((chat) => {
       if (chat.title.toLowerCase().includes(q)) return true;
-      
-      // Search in preview
       if (chat.preview && chat.preview.toLowerCase().includes(q)) return true;
-      
-      // Search in messages
-      // Add check before localStorage access
-      if (!isBrowser) return false;
-      
       const chatMessages = JSON.parse(localStorage.getItem(getStorageKey(chat.id)) || '[]');
-      return chatMessages.some((msg: Message) => 
-        msg.content.toLowerCase().includes(q) || 
-        msg.role.toLowerCase().includes(q)
+      return chatMessages.some((msg: Message) =>
+        msg.content.toLowerCase().includes(q) || msg.role.toLowerCase().includes(q)
       );
     });
-    
+
     setVisibleChats(filtered);
   };
 
@@ -196,98 +167,78 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       id: crypto.randomUUID(),
       content,
       role: 'user',
-      timestamp: new Date()
+      timestamp: Date.now() // ✅ FIXED
     };
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    
-    // Add check before localStorage access
     if (isBrowser) {
       localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(updatedMessages));
     }
-    
+
     setIsLoading(true);
 
-    // If using Supabase, store the user message
     await supabase.from('messages').insert({
       chat_id: activeChatId,
       user_id: userId,
       content: userMessage.content,
       role: userMessage.role,
-      timestamp: userMessage.timestamp.toISOString()
+      timestamp: userMessage.timestamp
     });
 
     try {
-      // Create an empty assistant message to show typing indicator
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
-        content: '', // Start with empty content
+        content: '',
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: Date.now() // ✅ FIXED
       };
 
-      // Add the empty assistant message to show typing indicator
       setMessages([...updatedMessages, assistantMessage]);
-      
-      let fullResponse = '';
-      
-      // Stream the response using Together AI
-      await chatService.streamMessage(
-        content, 
-        updatedMessages,
-        (chunk, fullContent) => {
-          fullResponse = fullContent;
-          
-          // Update the message content as chunks arrive
-          setMessages(current => {
-            const lastMessage = current[current.length - 1];
-            if (lastMessage.role === 'assistant') {
-              return [
-                ...current.slice(0, -1),
-                { ...lastMessage, content: fullContent }
-              ];
-            }
-            return current;
-          });
-        }
-      );
 
-      // Final response is now complete
+      let fullResponse = '';
+
+      await chatService.streamMessage(content, updatedMessages, (chunk, fullContent) => {
+        fullResponse = fullContent;
+        setMessages((current) => {
+          const lastMessage = current[current.length - 1];
+          if (lastMessage.role === 'assistant') {
+            return [
+              ...current.slice(0, -1),
+              { ...lastMessage, content: fullContent }
+            ];
+          }
+          return current;
+        });
+      });
+
       const completedAssistantMessage: Message = {
         ...assistantMessage,
-        content: fullResponse,
+        content: fullResponse
       };
 
       const allMessages = [...updatedMessages, completedAssistantMessage];
-      
-      // Update local storage with the complete conversation
+
       if (isBrowser) {
         localStorage.setItem(getStorageKey(activeChatId), JSON.stringify(allMessages));
       }
 
-      // Generate a preview from the user's message
       const preview = content.length > 64 ? content.slice(0, 64) + '...' : content;
-      
-      // Update the chat with the preview
-      const updatedChat = chats.map(chat => 
+      const updatedChat = chats.map((chat) =>
         chat.id === activeChatId ? { ...chat, preview } : chat
       );
       persistChats(updatedChat);
 
-      // Store the assistant message in Supabase
       await supabase.from('messages').insert({
         chat_id: activeChatId,
         user_id: userId,
         content: completedAssistantMessage.content,
         role: completedAssistantMessage.role,
-        timestamp: completedAssistantMessage.timestamp.toISOString()
+        timestamp: completedAssistantMessage.timestamp
       });
     } catch (err) {
       console.error('AI ERROR:', err);
-      
-      // Handle error by updating UI
-      setMessages(current => {
+      setMessages((current) => {
         const lastMessage = current[current.length - 1];
         if (lastMessage.role === 'assistant' && lastMessage.content === '') {
           return [
@@ -303,10 +254,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const exportChats = () => {
-    // Add check before localStorage access
-    if (!isBrowser) return;
-    
-    if (userId !== 'admin') return alert('Only admin can export');
+    if (!isBrowser || userId !== 'admin') return alert('Only admin can export');
 
     const exportData: Record<string, Message[]> = {};
     chats.forEach((chat) => {
