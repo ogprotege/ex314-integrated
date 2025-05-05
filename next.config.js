@@ -3,8 +3,11 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
-    // appDir option is now the default in Next.js 13.5+, so we can remove it
+    serverActions: true,
+  },
+  images: {
+    domains: ['images.unsplash.com']
   }
 }
 
-module.exports = nextConfig
+export default nextConfig;
