@@ -2,6 +2,7 @@
   "name": "ex314-ai",
   "version": "1.0.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",
-    "@ai-sdk/openai": ^1.0.0,
+    "@ai-sdk/openai": "^1.0.0",
     "together-ai": "^0.7.0",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
