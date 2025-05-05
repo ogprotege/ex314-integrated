@@ -3,7 +3,7 @@ import { MessageSchema } from './messageSchema';
 
 export const ChatSchema = z.object({
   id: z.string().uuid(),
-  title: z.string().min(1),
+  title: z.string(),
   messages: z.array(MessageSchema),
   createdAt: z.number(),
   updatedAt: z.number()
