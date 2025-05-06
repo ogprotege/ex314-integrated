@@ -11,6 +11,7 @@ type Settings = {
   aiTone: string;
   tokenLimit: string;
   markdown: boolean;
+  extendedThinking: boolean; // New setting for extended thinking
 };
 
 interface SettingsModalProps {
@@ -32,7 +33,8 @@ export const SettingsModal = ({ isOpen, onClose, onSave }: SettingsModalProps) =
     fontSize: 'normal',
     aiTone: 'formal',
     tokenLimit: '800',
-    markdown: true
+    markdown: true,
+    extendedThinking: false // Default to false
   });
 
   useEffect(() => {
@@ -43,7 +45,8 @@ export const SettingsModal = ({ isOpen, onClose, onSave }: SettingsModalProps) =
       fontSize: localStorage.getItem('font_size') || 'normal',
       aiTone: localStorage.getItem('ai_tone') || 'formal',
       tokenLimit: localStorage.getItem('token_limit') || '800',
-      markdown: localStorage.getItem('markdown_enabled') !== 'false' // default true
+      markdown: localStorage.getItem('markdown_enabled') !== 'false', // default true
+      extendedThinking: localStorage.getItem('extended_thinking_enabled') === 'true' // default false
     });
   }, [isOpen]);
 
@@ -55,6 +58,7 @@ export const SettingsModal = ({ isOpen, onClose, onSave }: SettingsModalProps) =
     localStorage.setItem('ai_tone', settings.aiTone);
     localStorage.setItem('token_limit', settings.tokenLimit);
     localStorage.setItem('markdown_enabled', String(settings.markdown));
+    localStorage.setItem('extended_thinking_enabled', String(settings.extendedThinking));
   };
 
   const handleSave = () => {
@@ -200,6 +204,21 @@ export const SettingsModal = ({ isOpen, onClose, onSave }: SettingsModalProps) =
                 />
                 <label htmlFor="markdownToggle" className="text-sm text-gray-300">
                   Enable Markdown Rendering
+                </label>
+              </div>
+              
+              <div className="flex items-center mt-4">
+                <input
+                  id="extendedThinkingToggle"
+                  type="checkbox"
+                  checked={settings.extendedThinking}
+                  onChange={(e) =>
+                    setSettings((s) => ({ ...s, extendedThinking: e.target.checked }))
+                  }
+                  className="mr-2"
+                />
+                <label htmlFor="extendedThinkingToggle" className="text-sm text-gray-300">
+                  Enable Extended Thinking
                 </label>
               </div>
             </>
